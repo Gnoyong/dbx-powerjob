@@ -4,12 +4,14 @@ import (
 	"bytes"
 	"encoding/json"
 	"log"
+	"strings"
 	"sync"
 
 	dbxpluginsdk "github.com/t8y2/dbx/plugins/sdk/go/dbx-plugin-sdk"
 )
 
 const pluginID = "local.powerjob.readonly"
+const appsContextMenuMethod = "contextMenu/local.powerjob.readonly.apps"
 
 type plugin struct {
 	mu       sync.RWMutex
@@ -54,6 +56,26 @@ func (p *plugin) Handle(_ dbxpluginsdk.RequestContext, method string, params jso
 		delete(p.sessions, id)
 		p.mu.Unlock()
 		return map[string]any{"success": true}, nil
+	case appsContextMenuMethod:
+		connection := values
+		if nested, ok := values["connection"].(map[string]any); ok {
+			connection = nested
+		}
+		id, ok := connection["id"].(string)
+		if !ok || strings.TrimSpace(id) == "" {
+			return nil, dbxpluginsdk.NewError(-32602, "Missing connection ID")
+		}
+		p.mu.RLock()
+		s := p.sessions[id]
+		p.mu.RUnlock()
+		if s == nil {
+			return map[string]any{"message": "Connect to PowerJob first, then try again."}, nil
+		}
+		message, err := s.appsMenuMessage()
+		if err != nil {
+			return nil, dbxpluginsdk.NewError(-32000, err.Error())
+		}
+		return map[string]any{"message": message}, nil
 	case "powerjob/apps", "powerjob/jobs", "powerjob/job", "powerjob/instances", "powerjob/instance", "powerjob/log":
 		id, _ := values["connectionId"].(string)
 		p.mu.RLock()
@@ -88,7 +110,7 @@ func (p *plugin) Handle(_ dbxpluginsdk.RequestContext, method string, params jso
 func main() {
 	metadata := dbxpluginsdk.Metadata{
 		ID:           pluginID,
-		Version:      "0.1.9",
+		Version:      "0.1.11",
 		Capabilities: []string{"connections"},
 	}
 	server := dbxpluginsdk.NewServer(metadata, &plugin{sessions: make(map[string]*session)})

@@ -47,6 +47,35 @@ func TestReadRoutesAndProjection(t *testing.T) {
 	}
 }
 
+func TestAppsMenuMessage(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/appInfo/list" {
+			t.Errorf("unexpected outbound request: %s %s", r.Method, r.URL.Path)
+		}
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Error(err)
+		}
+		if body["pageSize"] != float64(8) {
+			t.Errorf("apps menu request is not bounded: %#v", body)
+		}
+		fmt.Fprint(w, `{"success":true,"data":{"index":0,"pageSize":8,"totalPages":2,"totalItems":12,"data":[{"id":2,"appName":"Demo\nApp","password":"secret"},{"id":3,"title":"Backup"}]}}`)
+	}))
+	defer server.Close()
+
+	s := &session{baseURL: server.URL, client: server.Client()}
+	message, err := s.appsMenuMessage()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(message, "Demo App, Backup") || !strings.Contains(message, "2 of 12") {
+		t.Fatalf("unexpected apps menu message: %q", message)
+	}
+	if strings.Contains(message, "secret") || strings.Contains(message, "\n") {
+		t.Fatalf("apps menu exposed unsafe content: %q", message)
+	}
+}
+
 func TestLargeInstanceIDPreserved(t *testing.T) {
 	const instanceID = "981844507211334656"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

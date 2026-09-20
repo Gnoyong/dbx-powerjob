@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/url"
 	"strconv"
 	"strings"
@@ -124,6 +125,37 @@ func (s *session) read(method string, params map[string]any) (any, error) {
 		return result, nil
 	}
 	return nil, errors.New("unsupported read operation")
+}
+
+func (s *session) appsMenuMessage() (string, error) {
+	const maxApps = 8
+	result, err := s.read("powerjob/apps", map[string]any{"index": "0", "pageSize": strconv.Itoa(maxApps)})
+	if err != nil {
+		return "", err
+	}
+	page := result.(pageResult)
+	if len(page.Data) == 0 {
+		return "No applications found for this connection.", nil
+	}
+	names := make([]string, 0, len(page.Data))
+	for _, app := range page.Data {
+		name := strings.Join(strings.Fields(asString(app["appName"])), " ")
+		if name == "" {
+			name = strings.Join(strings.Fields(asString(app["title"])), " ")
+		}
+		if name == "" {
+			name = "#" + asString(app["id"])
+		}
+		runes := []rune(name)
+		if len(runes) > 40 {
+			name = string(runes[:40]) + "…"
+		}
+		names = append(names, name)
+	}
+	if page.TotalItems > len(names) {
+		return fmt.Sprintf("Applications (%d of %d): %s. Open PowerJob overview for the full list.", len(names), page.TotalItems, strings.Join(names, ", ")), nil
+	}
+	return fmt.Sprintf("Applications (%d): %s", len(names), strings.Join(names, ", ")), nil
 }
 
 func (s *session) page(path, appID string, body any, fields []string) (pageResult, error) {
