@@ -1,6 +1,6 @@
 import { Button } from "./ui/button";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLogs } from "../hooks/useLogs";
 import type { T } from "../uiTypes";
 
@@ -15,13 +15,11 @@ export function LogViewer({
   instanceId: string;
   t: T;
 }) {
-  const { pages, loading, failed, nextIndex, totalPages, loadNext } = useLogs(
-    connectionId,
-    appId,
-    instanceId,
-  );
+  const { pages, loading, failed, nextIndex, totalPages, loadNext, refreshLatest } =
+    useLogs(connectionId, appId, instanceId);
   const scroll = useRef<HTMLDivElement>(null);
   const autoFill = useRef(0);
+  const [followLatest, setFollowLatest] = useState(false);
   const more = totalPages !== null && nextIndex < totalPages;
   // A page can end in the middle of a line, so split only after joining pages.
   const content = useMemo(() => pages.join(""), [pages]);
@@ -32,10 +30,17 @@ export function LogViewer({
     estimateSize: () => 17,
     overscan: 8,
   });
+  const totalSize = virtualizer.getTotalSize();
+
+  function scrollToBottom() {
+    const panel = scroll.current;
+    if (panel) panel.scrollTop = panel.scrollHeight;
+  }
 
   useEffect(() => {
     autoFill.current = 0;
     if (scroll.current) scroll.current.scrollTop = 0;
+    setFollowLatest(false);
   }, [instanceId, appId]);
   useEffect(() => {
     if (!more || loading || failed || autoFill.current >= 4) return;
@@ -48,6 +53,19 @@ export function LogViewer({
     });
     return () => cancelAnimationFrame(frame);
   }, [pages, more, loading, failed, loadNext]);
+  useEffect(() => {
+    if (followLatest && more && !loading && !failed) void loadNext();
+  }, [followLatest, more, loading, failed, loadNext]);
+  useEffect(() => {
+    if (!followLatest || more || loading || failed || totalPages === null) return;
+    const timer = window.setInterval(() => void refreshLatest(), 3000);
+    return () => window.clearInterval(timer);
+  }, [followLatest, more, loading, failed, totalPages, refreshLatest]);
+  useEffect(() => {
+    if (!followLatest) return;
+    const frame = requestAnimationFrame(scrollToBottom);
+    return () => cancelAnimationFrame(frame);
+  }, [followLatest, content, totalSize]);
 
   let state = "";
   if (failed) state = t("logFailed");
@@ -62,11 +80,44 @@ export function LogViewer({
         <strong>{t("instanceLogs")}</strong>
         <span className="muted">{instanceId ? `#${instanceId}` : ""}</span>
         <span className="muted log-state">{state}</span>
+        <div className="log-controls">
+          <Button
+            type="button"
+            variant="ghost"
+            disabled={!lines.length}
+            onClick={() => {
+              setFollowLatest(false);
+              if (scroll.current) scroll.current.scrollTop = 0;
+            }}
+          >
+            {t("logToTop")}
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            disabled={!lines.length}
+            onClick={scrollToBottom}
+          >
+            {t("logToBottom")}
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            disabled={!instanceId}
+            aria-pressed={followLatest}
+            onClick={() => {
+              setFollowLatest((current) => !current);
+              if (!followLatest) scrollToBottom();
+            }}
+          >
+            {t("logFollowLatest")}
+          </Button>
+        </div>
         {failed && (
           <Button
             type="button"
             variant="ghost"
-            onClick={() => void loadNext()}
+            onClick={() => void (nextIndex === 0 || more ? loadNext() : refreshLatest())}
           >
             {t("retry")}
           </Button>
@@ -77,16 +128,21 @@ export function LogViewer({
         className="log-scroll"
         role="log"
         aria-label={t("instanceLogs")}
+        onWheel={(event) => {
+          if (event.deltaY < 0) setFollowLatest(false);
+        }}
         onScroll={(event) => {
           const panel = event.currentTarget;
-          if (panel.scrollTop + panel.clientHeight >= panel.scrollHeight - 80) {
+          const atBottom = panel.scrollTop + panel.clientHeight >= panel.scrollHeight - 80;
+          if (followLatest && !atBottom) setFollowLatest(false);
+          if (atBottom) {
             autoFill.current = 0;
             void loadNext();
           }
         }}
       >
         {lines.length ? (
-          <div className="log-rows" style={{ height: virtualizer.getTotalSize() }}>
+          <div className="log-rows" style={{ height: totalSize }}>
             {virtualizer.getVirtualItems().map((row) => (
               <pre
                 key={row.key}

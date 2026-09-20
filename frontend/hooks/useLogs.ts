@@ -54,6 +54,35 @@ export function useLogs(connectionId: string, appId: string, instanceId: string)
     }
   }, [connectionId, appId, instanceId]);
 
+  const refreshLatest = useCallback(async () => {
+    const current = state.current;
+    if (!connectionId || !appId || !instanceId || current.loading || current.index === 0)
+      return;
+    const seq = current.seq;
+    const index = current.index - 1;
+    current.loading = true;
+    try {
+      const result: LogPage = await invoke(connectionId, "powerjob/log", {
+        appId,
+        instanceId,
+        index,
+      });
+      if (seq !== state.current.seq) return;
+      current.total = result.totalPages;
+      setPages((previous) => {
+        const data = result.data || "";
+        if (previous[index] === data) return previous;
+        return previous.map((page, pageIndex) => pageIndex === index ? data : page);
+      });
+      setTotalPages(result.totalPages);
+      setFailed(false);
+    } catch {
+      if (seq === state.current.seq) setFailed(true);
+    } finally {
+      if (seq === state.current.seq) current.loading = false;
+    }
+  }, [connectionId, appId, instanceId]);
+
   useEffect(() => {
     state.current.seq++;
     state.current.index = 0;
@@ -69,5 +98,5 @@ export function useLogs(connectionId: string, appId: string, instanceId: string)
       state.current.seq++;
     };
   }, [instanceId, loadNext]);
-  return { pages, loading, failed, nextIndex, totalPages, loadNext };
+  return { pages, loading, failed, nextIndex, totalPages, loadNext, refreshLatest };
 }

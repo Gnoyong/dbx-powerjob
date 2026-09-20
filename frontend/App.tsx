@@ -29,6 +29,7 @@ import { RunJobDialog } from "./components/RunJobDialog";
 type Tab = "detail" | "runs";
 type Filter = { type: InstanceType; instanceId: string; status: string };
 const jobsPaneStorageKey = "local.powerjob.readonly.jobs-pane-width";
+const instancePollIntervalMs = 3000;
 
 function actionErrorKey(error: unknown): TranslationKey | null {
   const message = error instanceof Error ? error.message : "";
@@ -280,18 +281,23 @@ export default function App() {
 
   useEffect(() => {
     if (tab !== "runs" || !connectionId || !appId || !selectedJobId) return;
+    const activeConnectionId = connectionId;
     let active = true;
-    setInstancesStatus("loadingInstances");
-    void invoke(connectionId, "powerjob/instances", {
-      appId,
-      jobId: selectedJobId,
-      index: instanceIndex,
-      pageSize: 20,
-      type: filter.type,
-      instanceId: filter.instanceId,
-      status: filter.status,
-    })
-      .then((page) => {
+    let inFlight = false;
+    async function load(isInitial: boolean) {
+      if (inFlight) return;
+      inFlight = true;
+      if (isInitial) setInstancesStatus("loadingInstances");
+      try {
+        const page = await invoke(activeConnectionId, "powerjob/instances", {
+          appId,
+          jobId: selectedJobId,
+          index: instanceIndex,
+          pageSize: 20,
+          type: filter.type,
+          instanceId: filter.instanceId,
+          status: filter.status,
+        });
         if (!active) return;
         setInstances(page);
         setInstancesStatus(page.data.length ? "loading" : "noInstances");
@@ -300,15 +306,22 @@ export default function App() {
             ? previous
             : String(page.data[0]?.instanceId ?? ""),
         );
-      })
-      .catch(() => {
+      } catch {
         if (!active) return;
-        setInstances(null);
-        setSelectedInstanceId("");
-        setInstancesStatus("instancesFailed");
-      });
+        if (isInitial) {
+          setInstances(null);
+          setSelectedInstanceId("");
+          setInstancesStatus("instancesFailed");
+        }
+      } finally {
+        inFlight = false;
+      }
+    }
+    void load(true);
+    const timer = window.setInterval(() => { void load(false); }, instancePollIntervalMs);
     return () => {
       active = false;
+      window.clearInterval(timer);
     };
   }, [
     connectionId,
