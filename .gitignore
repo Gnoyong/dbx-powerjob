@@ -1,0 +1,7 @@
+/dist/
+/.dbx-dev/
+/backend/.go-cache/
+/backend/.go-mod-cache/
+.dbx-repository-signing-key.env
+.DS_Store
+*.log

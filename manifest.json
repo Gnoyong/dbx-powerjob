@@ -1,0 +1,71 @@
+{
+  "$schema": "https://raw.githubusercontent.com/t8y2/dbx/main/plugins/manifest.schema.json",
+  "manifest_version": 1,
+  "id": "local.powerjob.readonly",
+  "name": "PowerJob Read Only",
+  "version": "0.1.2",
+  "publisher": "local",
+  "description": "Browse PowerJob applications, jobs, instances and logs without write actions.",
+  "icon": "assets/plugin.svg",
+  "engines": { "host_api": "1" },
+  "permissions": [],
+  "entrypoints": {
+    "backend": {
+      "protocol_versions": [1],
+      "transport": "stdio-jsonl",
+      "executable": "bin/dbx-plugin-powerjob-plugin"
+    },
+    "ui": { "root": "ui", "entry": "ui/index.html" }
+  },
+  "contributions": [
+    {
+      "type": "connection-provider",
+      "id": "local.powerjob.readonly.connection",
+      "label": "PowerJob",
+      "icon": "assets/plugin.svg",
+      "database_type": "powerjob-readonly",
+      "description": "Connect to a PowerJob console with a PowerJob account.",
+      "fields": [
+        { "key": "display_name", "label": "Connection name", "type": "text", "default": "PowerJob", "binding": "name", "required": true },
+        { "key": "host", "label": "Host", "type": "text", "default": "powerjob.prod.oceanwear.online", "binding": "host", "required": true },
+        { "key": "port", "label": "HTTPS port", "type": "number", "default": 443, "binding": "port", "required": true },
+        { "key": "username", "label": "Username", "type": "text", "binding": "username", "required": true },
+        { "key": "password", "label": "Password", "type": "password", "binding": "password", "required": true },
+        { "key": "allow_insecure_tls", "label": "Skip TLS certificate validation", "type": "boolean", "binding": "config", "default": false, "description": "Use only for a trusted self-signed server. Server identity will not be verified." }
+      ],
+      "workbench": "local.powerjob.readonly.workbench",
+      "capabilities": ["test", "connect", "disconnect"]
+    },
+    {
+      "type": "workbench",
+      "id": "local.powerjob.readonly.workbench",
+      "label": "PowerJob overview",
+      "description": "Read-only applications, jobs, instances and logs.",
+      "icon": "assets/plugin.svg"
+    }
+  ],
+  "localizations": {
+    "zh-CN": {
+      "name": "PowerJob 只读查看",
+      "description": "只读查看 PowerJob 应用、任务、实例和日志。",
+      "contributions": {
+        "local.powerjob.readonly.connection": {
+          "label": "PowerJob 连接",
+          "description": "使用 PowerJob 账号连接控制台。",
+          "fields": {
+            "display_name": { "label": "连接名称" },
+            "host": { "label": "主机" },
+            "port": { "label": "HTTPS 端口" },
+            "username": { "label": "用户名" },
+            "password": { "label": "密码" },
+            "allow_insecure_tls": { "label": "跳过 TLS 证书校验", "description": "仅用于可信的自签名服务器；启用后无法验证服务器身份。" }
+          }
+        },
+        "local.powerjob.readonly.workbench": {
+          "label": "PowerJob 总览",
+          "description": "只读查看应用、任务、实例和日志。"
+        }
+      }
+    }
+  }
+}
