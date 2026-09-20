@@ -23,6 +23,23 @@ import { InstanceDialog } from "./components/InstanceDialog";
 type Tab = "detail" | "runs";
 type Filter = { type: InstanceType; instanceId: string };
 
+function actionErrorKey(error: unknown): TranslationKey | null {
+  const message = error instanceof Error ? error.message : "";
+  if (/read.only/i.test(message)) return "readOnlyAction";
+  if (/session expired|access denied/i.test(message))
+    return "actionSessionExpired";
+  if (/rejected the request|denied access/i.test(message))
+    return "powerJobDenied";
+  if (
+    /already changed|exported job changed|only failed normal instances/i.test(
+      message,
+    )
+  )
+    return "actionStateChanged";
+  if (/job state did not change/i.test(message)) return "actionNotApplied";
+  return null;
+}
+
 export default function App() {
   const [locale, setLocale] = useState<Locale>("en");
   const t: T = (key, vars) => translate(locale, key, vars);
@@ -56,6 +73,13 @@ export default function App() {
   const [selectedInstanceId, setSelectedInstanceId] = useState("");
   const [modal, setModal] = useState<Instance | null>(null);
   const [refresh, setRefresh] = useState(0);
+  const [instancesRefresh, setInstancesRefresh] = useState(0);
+  const [actionStatus, setActionStatus] = useState<TranslationKey | null>(null);
+  const [actionError, setActionError] = useState<TranslationKey | null>(null);
+  const [actionBusy, setActionBusy] = useState(false);
+  const actionPending = useRef(false);
+  const currentScope = useRef("");
+  currentScope.current = `${connectionId}:${appId}`;
   const [appsRefresh, setAppsRefresh] = useState(0);
   const appPageEdge = useRef<"first" | "last" | null>(null);
 
@@ -113,6 +137,8 @@ export default function App() {
     setInstances(null);
     setSelectedInstanceId("");
     setModal(null);
+    setActionStatus(null);
+    setActionError(null);
   }, [connectionId]);
 
   useEffect(() => {
@@ -135,7 +161,9 @@ export default function App() {
         setAppId((previous) =>
           !edge && page.data.some((item) => String(item.id) === previous)
             ? previous
-            : String(page.data[edge === "last" ? page.data.length - 1 : 0]?.id ?? ""),
+            : String(
+                page.data[edge === "last" ? page.data.length - 1 : 0]?.id ?? "",
+              ),
         );
       })
       .catch(() => {
@@ -157,6 +185,8 @@ export default function App() {
     setInstances(null);
     setSelectedInstanceId("");
     setModal(null);
+    setActionStatus(null);
+    setActionError(null);
   }, [appId]);
 
   useEffect(() => {
@@ -214,7 +244,7 @@ export default function App() {
     return () => {
       active = false;
     };
-  }, [connectionId, appId, selectedJobId, jobs]);
+  }, [connectionId, appId, selectedJobId, refresh]);
 
   useEffect(() => {
     setInstanceIndex(0);
@@ -255,7 +285,15 @@ export default function App() {
     return () => {
       active = false;
     };
-  }, [connectionId, appId, selectedJobId, tab, instanceIndex, filter, jobs]);
+  }, [
+    connectionId,
+    appId,
+    selectedJobId,
+    tab,
+    instanceIndex,
+    filter,
+    instancesRefresh,
+  ]);
 
   const selectedApp = apps?.data.find((item) => String(item.id) === appId);
   const appsLoading = !apps || apps.index !== appsIndex;
@@ -288,7 +326,9 @@ export default function App() {
   }
   function stepApp(direction: -1 | 1) {
     if (!apps || appsLoading) return;
-    const currentIndex = apps.data.findIndex((item) => String(item.id) === appId);
+    const currentIndex = apps.data.findIndex(
+      (item) => String(item.id) === appId,
+    );
     if (currentIndex < 0) return;
     const nextIndex = currentIndex + direction;
     if (nextIndex >= 0 && nextIndex < apps.data.length) {
@@ -312,10 +352,105 @@ export default function App() {
     setSelectedInstanceId(String(instance.instanceId));
   }
   function refreshCurrent() {
-    if (appId) setRefresh((value) => value + 1);
-    else if (connectionId) {
+    if (appId) {
+      setRefresh((value) => value + 1);
+      setInstancesRefresh((value) => value + 1);
+    } else if (connectionId) {
       setApps(null);
       setAppsRefresh((value) => value + 1);
+    }
+  }
+
+  async function setJobEnabled(job: Job) {
+    if (
+      !connectionId ||
+      !appId ||
+      typeof job.enable !== "boolean" ||
+      actionPending.current
+    )
+      return;
+    const enabled = !job.enable;
+    if (
+      !window.confirm(
+        t(enabled ? "confirmEnableJob" : "confirmDisableJob", {
+          name: label(job.jobName),
+          id: job.id,
+        }),
+      )
+    )
+      return;
+    actionPending.current = true;
+    const scope = currentScope.current;
+    setActionBusy(true);
+    setActionStatus("savingJob");
+    setActionError(null);
+    try {
+      await invoke(connectionId, "powerjob/setJobEnabled", {
+        appId,
+        jobId: job.id,
+        enabled,
+      });
+      if (currentScope.current === scope) {
+        setActionStatus(enabled ? "jobEnabled" : "jobDisabled");
+        setJobs((previous) => {
+          if (!previous) return previous;
+          const index = previous.data.findIndex(
+            (item) => String(item.id) === String(job.id),
+          );
+          if (index < 0) return previous;
+          const data = [...previous.data];
+          const current = data[index];
+          if (!current) return previous;
+          data[index] = { ...current, enable: enabled };
+          return { ...previous, data };
+        });
+      }
+    } catch (error) {
+      if (currentScope.current === scope) {
+        setActionStatus("jobActionFailed");
+        setActionError(actionErrorKey(error));
+      }
+    } finally {
+      actionPending.current = false;
+      setActionBusy(false);
+    }
+  }
+
+  async function retryFailedInstance(instance: Instance) {
+    if (
+      !connectionId ||
+      !appId ||
+      !selectedJobId ||
+      actionPending.current ||
+      filter.type !== "NORMAL"
+    )
+      return;
+    if (!window.confirm(t("confirmRetryFailed", { id: instance.instanceId })))
+      return;
+    actionPending.current = true;
+    const scope = currentScope.current;
+    setActionBusy(true);
+    setActionStatus("retryingInstance");
+    setActionError(null);
+    try {
+      await invoke(connectionId, "powerjob/retryFailedInstance", {
+        appId,
+        jobId: selectedJobId,
+        instanceId: instance.instanceId,
+      });
+      if (currentScope.current === scope) {
+        setActionStatus("instanceRetried");
+        setModal(null);
+        setInstancesRefresh((value) => value + 1);
+      }
+    } catch (error) {
+      if (currentScope.current === scope) {
+        setActionStatus("retryFailedMessage");
+        setActionError(actionErrorKey(error));
+      }
+    } finally {
+      actionPending.current = false;
+      setActionBusy(false);
     }
   }
 
@@ -348,6 +483,12 @@ export default function App() {
           {t(message)}
         </div>
       )}
+      {/* {actionStatus && (
+        <div role="status" aria-live="polite"
+          className={`message ${actionStatus === "jobEnabled" || actionStatus === "jobDisabled" || actionStatus === "instanceRetried" ? "success" : ""}`}>
+          {t(actionStatus)}{actionError && ` ${t(actionError)}`}
+        </div>
+      )} */}
       <main className="workspace">
         <JobsPane
           jobs={jobs}
@@ -358,6 +499,8 @@ export default function App() {
           onDraftKeywordChange={setDraftKeyword}
           onSearch={searchJobs}
           onChooseJob={chooseJob}
+          onSetJobEnabled={setJobEnabled}
+          busy={actionBusy}
           onPage={setJobsIndex}
           t={t}
         />
@@ -402,7 +545,9 @@ export default function App() {
           >
             <JobInspector
               detail={
-                detail && String(detail.id) === selectedJobId ? detail : null
+                detail && String(detail.id) === selectedJobId
+                  ? { ...detail, enable: selectedJob?.enable ?? detail.enable }
+                  : null
               }
               status={detailStatus}
               t={t}
@@ -426,6 +571,9 @@ export default function App() {
             onSearch={searchInstances}
             onChooseInstance={chooseInstance}
             onOpenInstance={setModal}
+            onRetryInstance={retryFailedInstance}
+            busy={actionBusy}
+            logRefresh={instancesRefresh}
             onPage={setInstanceIndex}
             t={t}
           />

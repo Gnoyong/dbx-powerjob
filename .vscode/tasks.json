@@ -1,0 +1,33 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "构建插件前端",
+      "type": "shell",
+      "command": "pnpm",
+      "args": ["run", "build"],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "打包 DBX 插件",
+      "type": "process",
+      "command": "node",
+      "args": ["node_modules/@dbx-app/plugin-cli/bin/dbx-plugin.js", "package", "."],
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "GOCACHE": "${workspaceFolder}/backend/.go-cache"
+        }
+      },
+      "dependsOn": "构建插件前端",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": []
+    }
+  ]
+}

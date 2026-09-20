@@ -1,7 +1,7 @@
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { NativeSelect, NativeSelectOption } from "./ui/native-select";
-import { dateLabel, label } from "../format";
+import { dateLabel, isFailedNormalInstance, label } from "../format";
 import type { Locale, TranslationKey } from "../i18n";
 import type { Instance, InstanceType, Page } from "../types";
 import type { T } from "../uiTypes";
@@ -13,7 +13,7 @@ export function RunsPane({
   visible, instances, loading, status, draftInstanceId, draftType, filterType,
   selectedInstanceId, locale, connectionId, appId, selectedJobId,
   onDraftInstanceIdChange, onDraftTypeChange, onSearch, onChooseInstance,
-  onOpenInstance, onPage, t,
+  onOpenInstance, onRetryInstance, busy, logRefresh, onPage, t,
 }: {
   visible: boolean;
   instances: Page<Instance> | null;
@@ -32,6 +32,9 @@ export function RunsPane({
   onSearch: () => void;
   onChooseInstance: (instance: Instance) => void;
   onOpenInstance: (instance: Instance) => void;
+  onRetryInstance: (instance: Instance) => void;
+  busy: boolean;
+  logRefresh: number;
   onPage: (index: number) => void;
   t: T;
 }) {
@@ -88,10 +91,18 @@ export function RunsPane({
                   <td><InstanceStatusBadge value={instance.status} type={filterType} locale={locale} /></td>
                   <td>{dateLabel(instance.actualTriggerTime, locale)}</td>
                   <td>{dateLabel(instance.finishedTime, locale)}</td>
-                  <td><Button type="button" variant="ghost" onClick={(event) => {
-                    event.stopPropagation();
-                    onOpenInstance(instance);
-                  }}>{t("detail")}</Button></td>
+                  <td className="instance-actions">
+                    {isFailedNormalInstance(instance.status, filterType) && (
+                      <Button type="button" variant="secondary" disabled={busy} onClick={(event) => {
+                        event.stopPropagation();
+                        onRetryInstance(instance);
+                      }}>{t("retryFailed")}</Button>
+                    )}
+                    <Button type="button" variant="ghost" onClick={(event) => {
+                      event.stopPropagation();
+                      onOpenInstance(instance);
+                    }}>{t("detail")}</Button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -99,7 +110,7 @@ export function RunsPane({
         </div>
         <Pager page={instances} onPage={onPage} t={t} />
       </div>
-      <LogViewer key={`${appId}:${selectedJobId}:${selectedInstanceId}`}
+      <LogViewer key={`${appId}:${selectedJobId}:${selectedInstanceId}:${logRefresh}`}
         connectionId={connectionId} appId={appId}
         instanceId={selectedInstanceId} t={t} />
     </section>

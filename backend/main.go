@@ -67,6 +67,19 @@ func (p *plugin) Handle(_ dbxpluginsdk.RequestContext, method string, params jso
 			return nil, dbxpluginsdk.NewError(-32000, err.Error())
 		}
 		return result, nil
+	case "powerjob/setJobEnabled", "powerjob/retryFailedInstance":
+		id, _ := values["connectionId"].(string)
+		p.mu.RLock()
+		s := p.sessions[id]
+		p.mu.RUnlock()
+		if s == nil {
+			return nil, dbxpluginsdk.NewError(-32001, "Connection is not active. Reconnect and try again.")
+		}
+		result, err := s.write(method, values)
+		if err != nil {
+			return nil, dbxpluginsdk.NewError(-32000, err.Error())
+		}
+		return result, nil
 	default:
 		return nil, dbxpluginsdk.MethodNotFound(method)
 	}
@@ -75,7 +88,7 @@ func (p *plugin) Handle(_ dbxpluginsdk.RequestContext, method string, params jso
 func main() {
 	metadata := dbxpluginsdk.Metadata{
 		ID:           pluginID,
-		Version:      "0.1.5",
+		Version:      "0.1.9",
 		Capabilities: []string{"connections"},
 	}
 	server := dbxpluginsdk.NewServer(metadata, &plugin{sessions: make(map[string]*session)})

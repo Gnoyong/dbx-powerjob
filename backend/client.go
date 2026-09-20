@@ -29,12 +29,14 @@ type connectionConfig struct {
 	username         string
 	password         string
 	allowInsecureTLS bool
+	readOnly         bool
 }
 
 type session struct {
-	baseURL string
-	client  *http.Client
-	jwt     string
+	baseURL  string
+	client   *http.Client
+	jwt      string
+	readOnly bool
 }
 
 type envelope struct {
@@ -61,6 +63,7 @@ func parseConnection(values map[string]any) (connectionConfig, error) {
 		username:         strings.TrimSpace(asString(connection["username"])),
 		password:         asString(connection["password"]),
 		allowInsecureTLS: config["allow_insecure_tls"] == true,
+		readOnly:         connection["read_only"] == true,
 	}
 	if cfg.host == "" || !validHost(cfg.host) {
 		return cfg, errors.New("host must be a hostname or IP address without a scheme or path")
@@ -126,7 +129,8 @@ func login(cfg connectionConfig) (*session, error) {
 	transport.TLSClientConfig = &tls.Config{MinVersion: tls.VersionTLS12, ServerName: cfg.host, InsecureSkipVerify: cfg.allowInsecureTLS}
 	base := "https://" + net.JoinHostPort(cfg.runtimeHost, strconv.Itoa(cfg.port))
 	s := &session{
-		baseURL: base,
+		baseURL:  base,
+		readOnly: cfg.readOnly,
 		client: &http.Client{
 			Timeout:       20 * time.Second,
 			Transport:     transport,

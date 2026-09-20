@@ -7,6 +7,8 @@ type MethodResult = {
   "powerjob/instances": Page<Instance>;
   "powerjob/instance": Record<string, unknown>;
   "powerjob/log": LogPage;
+  "powerjob/setJobEnabled": { success: boolean };
+  "powerjob/retryFailedInstance": { success: boolean };
 };
 
 type Context = { connectionId?: string } | null;

@@ -58,6 +58,10 @@ export function dateLabel(value: unknown, locale: Locale): string {
   return Number.isNaN(date.getTime()) ? label(value) : date.toLocaleString(locale);
 }
 
+export function isFailedNormalInstance(value: unknown, type: InstanceType): boolean {
+  return type === "NORMAL" && statusKeys.NORMAL[String(value).toUpperCase()] === "instanceFailed";
+}
+
 export const jobFields: [string, TranslationKey][] = [
   ["id", "jobId"], ["jobName", "jobName"], ["jobDescription", "description"],
   ["enable", "enabled"], ["appId", "appId"], ["timeExpressionType", "timeExpressionType"],

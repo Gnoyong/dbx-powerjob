@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { label } from "../format";
@@ -5,6 +6,8 @@ import type { TranslationKey } from "../i18n";
 import type { Job, Page } from "../types";
 import type { T } from "../uiTypes";
 import { Pager } from "./Pager";
+
+type JobMenu = { job: Job; x: number; y: number };
 
 export function JobsPane({
   jobs,
@@ -15,6 +18,8 @@ export function JobsPane({
   onDraftKeywordChange,
   onSearch,
   onChooseJob,
+  onSetJobEnabled,
+  busy,
   onPage,
   t,
 }: {
@@ -26,9 +31,51 @@ export function JobsPane({
   onDraftKeywordChange: (value: string) => void;
   onSearch: () => void;
   onChooseJob: (job: Job) => void;
+  onSetJobEnabled: (job: Job) => void;
+  busy: boolean;
   onPage: (index: number) => void;
   t: T;
 }) {
+  const [menu, setMenu] = useState<JobMenu | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const menuItemRef = useRef<HTMLButtonElement>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    if (!menu) return;
+    menuItemRef.current?.focus();
+    const closeOnOutside = (event: PointerEvent) => {
+      if (!menuRef.current?.contains(event.target as Node)) setMenu(null);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setMenu(null);
+        triggerRef.current?.focus();
+      }
+    };
+    const close = () => setMenu(null);
+    window.addEventListener("pointerdown", closeOnOutside);
+    window.addEventListener("keydown", closeOnEscape);
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+    return () => {
+      window.removeEventListener("pointerdown", closeOnOutside);
+      window.removeEventListener("keydown", closeOnEscape);
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close);
+    };
+  }, [menu]);
+
+  useEffect(() => setMenu(null), [jobs]);
+
+  function openMenu(job: Job, trigger: HTMLButtonElement, x: number, y: number) {
+    if (busy || typeof job.enable !== "boolean") return;
+    triggerRef.current = trigger;
+    setMenu({ job, x: Math.max(4, Math.min(x, window.innerWidth - 180)),
+      y: Math.max(4, Math.min(y, window.innerHeight - 44)) });
+  }
+
   return (
     <section
       id="jobs-pane"
@@ -88,8 +135,22 @@ export function JobsPane({
                 type="button"
                 className="job-item"
                 aria-pressed={String(job.id) === selectedJobId}
-                title={`${label(job.jobName)} · ${label(job.id)}`}
+                aria-haspopup={typeof job.enable === "boolean" ? "menu" : undefined}
+                aria-expanded={menu?.job.id === job.id}
+                title={`${label(job.jobName)} · ${label(job.id)} · ${t("jobContextHint")}`}
                 onClick={() => onChooseJob(job)}
+                onContextMenu={(event) => {
+                  if (typeof job.enable !== "boolean") return;
+                  event.preventDefault();
+                  openMenu(job, event.currentTarget, event.clientX, event.clientY);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) {
+                    event.preventDefault();
+                    const rect = event.currentTarget.getBoundingClientRect();
+                    openMenu(job, event.currentTarget, rect.left + 12, rect.bottom);
+                  }
+                }}
               >
                 <span className="job-main">
                   <span className="job-name">{label(job.jobName)}</span>
@@ -108,6 +169,19 @@ export function JobsPane({
           ))
         )}
       </div>
+      {menu && (
+        <div id="job-context-menu" ref={menuRef} className="job-context-menu"
+          role="menu" aria-label={t("jobActions")}
+          style={{ left: menu.x, top: menu.y }}>
+          <button ref={menuItemRef} type="button" role="menuitem" disabled={busy}
+            onClick={() => {
+              setMenu(null);
+              onSetJobEnabled(menu.job);
+            }}>
+            {t(menu.job.enable ? "disableJob" : "enableJob")}
+          </button>
+        </div>
+      )}
       <Pager
         page={jobs}
         onPage={onPage}
