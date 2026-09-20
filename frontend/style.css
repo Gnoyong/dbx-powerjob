@@ -666,6 +666,18 @@ button:focus-visible {
   white-space: pre-wrap;
 }
 
+.log-rows {
+  position: relative;
+}
+
+.log-scroll .log-row {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  min-height: 1.5em;
+}
+
 .log-scroll #log-more {
   display: block;
   margin: 8px auto;

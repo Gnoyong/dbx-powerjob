@@ -1,5 +1,6 @@
 import { Button } from "./ui/button";
-import { useEffect, useRef } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import { useEffect, useMemo, useRef } from "react";
 import { useLogs } from "../hooks/useLogs";
 import type { T } from "../uiTypes";
 
@@ -22,7 +23,15 @@ export function LogViewer({
   const scroll = useRef<HTMLDivElement>(null);
   const autoFill = useRef(0);
   const more = totalPages !== null && nextIndex < totalPages;
-  const content = pages.join("");
+  // A page can end in the middle of a line, so split only after joining pages.
+  const content = useMemo(() => pages.join(""), [pages]);
+  const lines = useMemo(() => (content ? content.split("\n") : []), [content]);
+  const virtualizer = useVirtualizer({
+    count: lines.length,
+    getScrollElement: () => scroll.current,
+    estimateSize: () => 17,
+    overscan: 8,
+  });
 
   useEffect(() => {
     autoFill.current = 0;
@@ -76,17 +85,33 @@ export function LogViewer({
           }
         }}
       >
-        <pre>
-          {!instanceId
-            ? t("selectInstanceLog")
-            : failed && pages.length === 0
-              ? t("logFailed")
-              : loading && pages.length === 0
-                ? t("loadingLogs")
-                : !content && !more && !loading
-                  ? t("noLogs")
-                  : content}
-        </pre>
+        {lines.length ? (
+          <div className="log-rows" style={{ height: virtualizer.getTotalSize() }}>
+            {virtualizer.getVirtualItems().map((row) => (
+              <pre
+                key={row.key}
+                data-index={row.index}
+                ref={virtualizer.measureElement}
+                className="log-row"
+                style={{ transform: `translateY(${row.start}px)` }}
+              >
+                {lines[row.index]}
+              </pre>
+            ))}
+          </div>
+        ) : (
+          <pre>
+            {!instanceId
+              ? t("selectInstanceLog")
+              : failed && pages.length === 0
+                ? t("logFailed")
+                : loading && pages.length === 0
+                  ? t("loadingLogs")
+                  : !more && !loading
+                    ? t("noLogs")
+                    : null}
+          </pre>
+        )}
         {more && autoFill.current >= 4 && !loading && (
           <Button
             type="button"
