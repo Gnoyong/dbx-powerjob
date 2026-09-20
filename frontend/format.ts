@@ -27,6 +27,29 @@ export function statusLabel(value: unknown, type: InstanceType, locale: Locale):
   return key ? translate(locale, key) : label(value);
 }
 
+export type StatusTone = "pending" | "running" | "success" | "failed" | "stopped" | "unknown";
+
+export function statusTone(value: unknown, type: InstanceType): StatusTone {
+  const key = statusKeys[type][String(value).toUpperCase()];
+  switch (key) {
+    case "instanceWaitingDispatch":
+    case "instanceWaitingWorker":
+    case "workflowWaiting":
+      return "pending";
+    case "instanceRunning":
+      return "running";
+    case "instanceSucceeded":
+      return "success";
+    case "instanceFailed":
+      return "failed";
+    case "instanceCanceled":
+    case "instanceStopped":
+      return "stopped";
+    default:
+      return "unknown";
+  }
+}
+
 export function dateLabel(value: unknown, locale: Locale): string {
   if (!value) return "—";
   const number = Number(value);

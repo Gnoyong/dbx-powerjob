@@ -6,6 +6,7 @@ import type { Instance, InstanceType } from "../types";
 import type { T } from "../uiTypes";
 import { Button } from "./ui/button";
 import { Dialog, DialogClose, DialogContent, DialogTitle } from "./ui/dialog";
+import { InstanceStatusBadge } from "./InstanceStatusBadge";
 
 export function InstanceDialog({
   instance,
@@ -53,6 +54,9 @@ export function InstanceDialog({
       <DialogContent>
         <div className="dialog-head">
           <DialogTitle>{t("instanceTitle", { id: instance.instanceId })}</DialogTitle>
+          {result && Object.hasOwn(result, "status") && (
+            <InstanceStatusBadge value={result.status} type={type} locale={locale} />
+          )}
           <DialogClose asChild>
             <Button type="button" variant="ghost" aria-label={t("close")}>×</Button>
           </DialogClose>

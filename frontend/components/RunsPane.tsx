@@ -2,12 +2,13 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { NativeSelect, NativeSelectOption } from "./ui/native-select";
 import type { FormEvent } from "react";
-import { dateLabel, label, statusLabel } from "../format";
+import { dateLabel, label } from "../format";
 import type { Locale, TranslationKey } from "../i18n";
 import type { Instance, InstanceType, Page } from "../types";
 import type { T } from "../uiTypes";
 import { LogViewer } from "./LogViewer";
 import { Pager } from "./Pager";
+import { InstanceStatusBadge } from "./InstanceStatusBadge";
 
 export function RunsPane({
   visible, instances, loading, status, draftInstanceId, draftType, filterType,
@@ -79,7 +80,7 @@ export function RunsPane({
                     }
                   }}>
                   <td>{label(instance.instanceId)}</td>
-                  <td>{statusLabel(instance.status, filterType, locale)}</td>
+                  <td><InstanceStatusBadge value={instance.status} type={filterType} locale={locale} /></td>
                   <td>{dateLabel(instance.actualTriggerTime, locale)}</td>
                   <td>{dateLabel(instance.finishedTime, locale)}</td>
                   <td><Button type="button" variant="ghost" onClick={(event) => {
