@@ -8,6 +8,7 @@ type MethodResult = {
   "powerjob/instance": Record<string, unknown>;
   "powerjob/log": LogPage;
   "powerjob/setJobEnabled": { success: boolean };
+  "powerjob/updateJob": { success: boolean };
   "powerjob/retryFailedInstance": { success: boolean };
   "powerjob/runJob": { instanceId: string };
 };

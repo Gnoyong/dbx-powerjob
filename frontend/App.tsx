@@ -39,7 +39,7 @@ function actionErrorKey(error: unknown): TranslationKey | null {
   if (/rejected the request|denied access/i.test(message))
     return "powerJobDenied";
   if (
-    /already changed|exported job changed|only failed normal instances/i.test(
+    /already changed|exported job changed|only failed normal instances|job was not updated/i.test(
       message,
     )
   )
@@ -83,6 +83,7 @@ export default function App() {
   const [selectedInstanceId, setSelectedInstanceId] = useState("");
   const [modal, setModal] = useState<Instance | null>(null);
   const [runTarget, setRunTarget] = useState<Job | null>(null);
+  const [editError, setEditError] = useState<TranslationKey | null>(null);
   const [runError, setRunError] = useState<TranslationKey | null>(null);
   const [runInstanceId, setRunInstanceId] = useState("");
   const [refresh, setRefresh] = useState(0);
@@ -106,7 +107,10 @@ export default function App() {
   const [appsRefresh, setAppsRefresh] = useState(0);
   const appPageEdge = useRef<"first" | "last" | null>(null);
 
-  useEffect(() => { setRunTarget(null); }, [connectionId, appId]);
+  useEffect(() => {
+    setRunTarget(null);
+    setEditError(null);
+  }, [connectionId, appId]);
 
   useEffect(() => {
     let active = true;
@@ -318,7 +322,9 @@ export default function App() {
       }
     }
     void load(true);
-    const timer = window.setInterval(() => { void load(false); }, instancePollIntervalMs);
+    const timer = window.setInterval(() => {
+      void load(false);
+    }, instancePollIntervalMs);
     return () => {
       active = false;
       window.clearInterval(timer);
@@ -355,7 +361,11 @@ export default function App() {
   }
   function searchInstances() {
     setInstanceIndex(0);
-    setFilter({ type: draftType, instanceId: draftInstanceId.trim(), status: draftStatus });
+    setFilter({
+      type: draftType,
+      instanceId: draftInstanceId.trim(),
+      status: draftStatus,
+    });
   }
   function chooseApp(next: string) {
     setAppId(next);
@@ -382,9 +392,37 @@ export default function App() {
   }
   function chooseJob(job: Job) {
     if (String(job.id) === selectedJobId) return;
+    setEditError(null);
     setSelectedJobId(String(job.id));
     setInstanceIndex(0);
     setDetail(null);
+  }
+
+  async function updateJob(changes: Record<string, unknown>) {
+    if (!connectionId || !appId || !selectedJobId || actionPending.current || !Object.keys(changes).length) return;
+    actionPending.current = true;
+    const scope = currentScope.current;
+    setActionBusy(true);
+    setActionStatus("savingJob");
+    setActionError(null);
+    setEditError(null);
+    try {
+      await invoke(connectionId, "powerjob/updateJob", { appId, jobId: selectedJobId, changes });
+      if (currentScope.current === scope) {
+        setActionStatus("jobUpdated");
+        setRefresh((value) => value + 1);
+      }
+    } catch (error) {
+      if (currentScope.current === scope) {
+        setActionStatus("jobUpdateFailed");
+        const key = actionErrorKey(error);
+        setActionError(key);
+        setEditError(key);
+      }
+    } finally {
+      actionPending.current = false;
+      setActionBusy(false);
+    }
   }
   function chooseInstance(instance: Instance) {
     setSelectedInstanceId(String(instance.instanceId));
@@ -465,7 +503,9 @@ export default function App() {
     setActionError(null);
     try {
       const result = await invoke(connectionId, "powerjob/runJob", {
-        appId, jobId: job.id, instanceParams,
+        appId,
+        jobId: job.id,
+        instanceParams,
       });
       if (currentScope.current === scope) {
         setRunInstanceId(result.instanceId);
@@ -562,9 +602,13 @@ export default function App() {
         </div>
       )}
       {actionStatus && (
-        <div role="status" aria-live="polite"
-          className={`message ${actionStatus === "jobEnabled" || actionStatus === "jobDisabled" || actionStatus === "instanceRetried" || actionStatus === "jobRunRequested" ? "success" : ""}`}>
-          {t(actionStatus, { id: runInstanceId })}{actionError && ` ${t(actionError)}`}
+        <div
+          role="status"
+          aria-live="polite"
+          className={`message ${actionStatus === "jobEnabled" || actionStatus === "jobDisabled" || actionStatus === "instanceRetried" || actionStatus === "jobRunRequested" || actionStatus === "jobUpdated" ? "success" : ""}`}
+        >
+          {t(actionStatus, { id: runInstanceId })}
+          {actionError && ` ${t(actionError)}`}
         </div>
       )}
       <main className="workspace">
@@ -615,7 +659,10 @@ export default function App() {
               t={t}
             />
           </ResizablePanel>
-          <ResizableHandle withHandle aria-label={t("resizeJobsPane")} />
+          <ResizableHandle
+            withHandle
+            aria-label={t("resizeJobsPane")}
+          />
           <ResizablePanel
             id="details-panel"
             className="workspace-panel"
@@ -660,12 +707,21 @@ export default function App() {
                 hidden={tab !== "detail"}
               >
                 <JobInspector
+                  key={`${appId}:${selectedJobId}:${refresh}`}
                   detail={
                     detail && String(detail.id) === selectedJobId
-                      ? { ...detail, enable: selectedJob?.enable ?? detail.enable }
+                      ? {
+                          ...detail,
+                          enable: selectedJob?.enable ?? detail.enable,
+                        }
                       : null
                   }
                   status={detailStatus}
+                  busy={actionBusy}
+                  error={editError}
+                  onSave={updateJob}
+                  onEdit={() => setEditError(null)}
+                  locale={locale}
                   t={t}
                 />
               </section>
@@ -715,9 +771,15 @@ export default function App() {
         />
       )}
       {runTarget && (
-        <RunJobDialog key={`${appId}:${runTarget.id}`} job={runTarget}
-          busy={actionBusy} error={runError} onRun={runJob}
-          onClose={() => setRunTarget(null)} t={t} />
+        <RunJobDialog
+          key={`${appId}:${runTarget.id}`}
+          job={runTarget}
+          busy={actionBusy}
+          error={runError}
+          onRun={runJob}
+          onClose={() => setRunTarget(null)}
+          t={t}
+        />
       )}
     </div>
   );

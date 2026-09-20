@@ -72,7 +72,7 @@ func (s *session) read(method string, params map[string]any) (any, error) {
 		}
 		status := asString(params["status"])
 		allowedStatuses := map[string]string{
-			"NORMAL": "WAITING_DISPATCH,WAITING_WORKER_RECEIVE,RUNNING,FAILED,SUCCEED,CANCELED,STOPPED",
+			"NORMAL":   "WAITING_DISPATCH,WAITING_WORKER_RECEIVE,RUNNING,FAILED,SUCCEED,CANCELED,STOPPED",
 			"WORKFLOW": "WAITING,RUNNING,FAILED,SUCCEED,STOPPED",
 		}
 		if status != "" && !strings.Contains(","+allowedStatuses[kind]+",", ","+status+",") {
@@ -236,6 +236,6 @@ func pagination(params map[string]any) (int, int, error) {
 
 var appFields = []string{"id", "appName", "title", "namespaceId", "namespaceName", "tags", "gmtCreateStr", "gmtModifiedStr"}
 var jobListFields = []string{"id", "jobName", "jobDescription", "appId", "timeExpressionType", "timeExpression", "executeType", "processorType", "processorInfo", "enable", "nextTriggerTimeStr", "gmtModified"}
-var jobDetailFields = []string{"id", "jobName", "jobDescription", "appId", "jobParams", "timeExpressionType", "timeExpression", "executeType", "processorType", "processorInfo", "enable", "nextTriggerTimeStr", "maxInstanceNum", "concurrency", "instanceTimeLimit", "instanceRetryNum", "taskRetryNum", "dispatchStrategy", "designatedWorkers", "maxWorkerCount", "lifeCycle", "alarmConfig", "logConfig", "advancedRuntimeConfig", "gmtCreate", "gmtModified"}
+var jobDetailFields = []string{"id", "jobName", "jobDescription", "appId", "jobParams", "timeExpressionType", "timeExpression", "executeType", "processorType", "processorInfo", "enable", "nextTriggerTimeStr", "maxInstanceNum", "concurrency", "instanceTimeLimit", "instanceRetryNum", "taskRetryNum", "minCpuCores", "minMemorySpace", "minDiskSpace", "dispatchStrategy", "dispatchStrategyConfig", "designatedWorkers", "maxWorkerCount", "tag", "extra", "lifeCycle", "alarmConfig", "logConfig", "advancedRuntimeConfig", "gmtCreate", "gmtModified"}
 var instanceListFields = []string{"jobId", "jobName", "instanceId", "wfInstanceId", "status", "result", "runningTimes", "actualTriggerTime", "finishedTime"}
 var instanceDetailFields = []string{"expectedTriggerTime", "actualTriggerTime", "finishedTime", "status", "result", "taskTrackerAddress", "jobParams", "instanceParams", "taskDetail", "queriedTaskDetailInfoList", "subInstanceDetails", "runningTimes"}

@@ -5,7 +5,7 @@
   "name": "PowerJob Workbench",
   "version": "0.1.15",
   "publisher": "local",
-  "description": "Browse PowerJob jobs and instances, run and toggle jobs, and retry failed normal instances.",
+  "description": "Browse and edit PowerJob jobs, inspect instances, run and toggle jobs, and retry failed normal instances.",
   "icon": "assets/plugin.svg",
   "engines": { "host_api": "1" },
   "permissions": [],

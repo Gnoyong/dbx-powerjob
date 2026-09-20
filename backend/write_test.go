@@ -59,6 +59,198 @@ func TestEnableJobSavesCompleteConsoleJobWithoutLosingConfiguration(t *testing.T
 	}
 }
 
+func TestUpdateJobAppliesOnlyEditableChangesAndVerifiesState(t *testing.T) {
+	var saved map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/job/list":
+			if saved == nil {
+				fmt.Fprint(w, `{"success":true,"data":{"data":[{"id":7,"appId":2,"enable":true,"jobName":"old","jobDescription":"keep","processorInfo":"foo","executeType":"STANDALONE","processorType":"BUILT_IN","timeExpressionType":"CRON","concurrency":2,"advancedRuntimeConfig":{"x":123}}]}}`)
+				return
+			}
+			encoded, _ := json.Marshal(saved)
+			fmt.Fprintf(w, `{"success":true,"data":{"data":[%s]}}`, encoded)
+		case "/job/save":
+			decoder := json.NewDecoder(r.Body)
+			decoder.UseNumber()
+			if err := decoder.Decode(&saved); err != nil {
+				t.Fatal(err)
+			}
+			fmt.Fprint(w, `{"success":true,"data":7}`)
+		default:
+			t.Errorf("unexpected route: %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+	s := &session{baseURL: server.URL, client: server.Client()}
+	if err := s.updateJob("2", "7", map[string]any{"jobName": "new", "concurrency": json.Number("4")}); err != nil {
+		t.Fatal(err)
+	}
+	if saved["jobName"] != "new" || saved["jobDescription"] != "keep" || saved["concurrency"] != json.Number("4") {
+		t.Fatalf("unexpected saved job: %#v", saved)
+	}
+}
+
+func TestUpdateJobRejectsNonEditableFieldsBeforeRequest(t *testing.T) {
+	s := &session{}
+	for _, changes := range []map[string]any{
+		{"id": "8"}, {"appId": "3"}, {"enable": "false"}, {"unknown": "x"},
+		{"concurrency": "not-a-number"}, {"alarmConfig": []any{"not-an-object"}},
+		{"lifeCycle": "1720000000000"},
+		{"lifeCycle": map[string]any{"start": json.Number("172000000000"), "end": nil}},
+		{"lifeCycle": map[string]any{"start": json.Number("1720000000000"), "end": json.Number("1710000000000")}},
+		{"lifeCycle": map[string]any{"start": json.Number("1720000000000"), "end": nil, "unexpected": true}},
+		{"alarmConfig": map[string]any{"alertThreshold": json.Number("1")}},
+		{"alarmConfig": map[string]any{"alertThreshold": json.Number("1"), "statisticWindowLen": json.Number("2"), "silenceWindowLen": nil}},
+		{"logConfig": map[string]any{"type": json.Number("5")}},
+		{"advancedRuntimeConfig": map[string]any{"taskTrackerBehavior": json.Number("5")}},
+	} {
+		if _, err := s.write("powerjob/updateJob", map[string]any{"appId": "2", "jobId": "7", "changes": changes}); err == nil {
+			t.Fatalf("accepted unsafe changes: %#v", changes)
+		}
+	}
+}
+
+func TestUpdateJobDisablesThroughDedicatedRoute(t *testing.T) {
+	var calls []string
+	enabled := true
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls = append(calls, r.Method+" "+r.URL.Path)
+		switch r.URL.Path {
+		case "/job/list":
+			fmt.Fprintf(w, `{"success":true,"data":{"data":[{"id":7,"appId":2,"enable":%t,"jobName":"demo","processorInfo":"foo","executeType":"STANDALONE","processorType":"BUILT_IN","timeExpressionType":"CRON"}]}}`, enabled)
+		case "/job/disable":
+			if r.Method != http.MethodGet || r.URL.Query().Get("jobId") != "7" {
+				t.Errorf("unexpected disable request: %s", r.URL)
+			}
+			enabled = false
+			fmt.Fprint(w, `{"success":true,"data":null}`)
+		default:
+			t.Errorf("unexpected route: %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+	s := &session{baseURL: server.URL, client: server.Client()}
+	if err := s.updateJob("2", "7", map[string]any{"enable": false}); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(calls, []string{"POST /job/list", "GET /job/disable", "POST /job/list"}) {
+		t.Fatalf("unexpected route sequence: %v", calls)
+	}
+}
+
+func TestUpdateJobSavesConfigBeforeDisabling(t *testing.T) {
+	var calls []string
+	job := map[string]any{
+		"id": json.Number("7"), "appId": json.Number("2"), "enable": true,
+		"jobName": "demo", "processorInfo": "foo", "executeType": "STANDALONE",
+		"processorType": "BUILT_IN", "timeExpressionType": "CRON",
+		"alarmConfig": map[string]any{"alertThreshold": json.Number("1"), "statisticWindowLen": json.Number("30"), "silenceWindowLen": json.Number("60")},
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls = append(calls, r.Method+" "+r.URL.Path)
+		switch r.URL.Path {
+		case "/job/list":
+			encoded, _ := json.Marshal(job)
+			fmt.Fprintf(w, `{"success":true,"data":{"data":[%s]}}`, encoded)
+		case "/job/save":
+			decoder := json.NewDecoder(r.Body)
+			decoder.UseNumber()
+			if err := decoder.Decode(&job); err != nil {
+				t.Error(err)
+			}
+			if job["enable"] != true {
+				t.Error("save disabled the job without /job/disable")
+			}
+			fmt.Fprint(w, `{"success":true,"data":7}`)
+		case "/job/disable":
+			job["enable"] = false
+			fmt.Fprint(w, `{"success":true,"data":null}`)
+		default:
+			t.Errorf("unexpected route: %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+	s := &session{baseURL: server.URL, client: server.Client()}
+	config := map[string]any{"alertThreshold": json.Number("2"), "statisticWindowLen": json.Number("30"), "silenceWindowLen": json.Number("60")}
+	if err := s.updateJob("2", "7", map[string]any{"alarmConfig": config, "enable": false}); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(calls, []string{"POST /job/list", "POST /job/save", "GET /job/disable", "POST /job/list"}) {
+		t.Fatalf("unexpected route sequence: %v", calls)
+	}
+	if !reflect.DeepEqual(job["alarmConfig"], config) || job["enable"] != false {
+		t.Fatalf("unexpected saved config: %#v", job)
+	}
+}
+
+func TestUpdateJobPreservesMillisecondLifeCycle(t *testing.T) {
+	var saved map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/job/list":
+			if saved == nil {
+				fmt.Fprint(w, `{"success":true,"data":{"data":[{"id":7,"appId":2,"enable":true,"jobName":"demo","processorInfo":"foo","executeType":"STANDALONE","processorType":"BUILT_IN","timeExpressionType":"CRON","lifeCycle":{"start":1720000000123,"end":null}}]}}`)
+				return
+			}
+			encoded, _ := json.Marshal(saved)
+			fmt.Fprintf(w, `{"success":true,"data":{"data":[%s]}}`, encoded)
+		case "/job/save":
+			decoder := json.NewDecoder(r.Body)
+			decoder.UseNumber()
+			if err := decoder.Decode(&saved); err != nil {
+				t.Error(err)
+			}
+			fmt.Fprint(w, `{"success":true,"data":7}`)
+		default:
+			t.Errorf("unexpected route: %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+	s := &session{baseURL: server.URL, client: server.Client()}
+	change := map[string]any{"lifeCycle": map[string]any{"start": json.Number("1720000000123"), "end": json.Number("1730000000456")}}
+	if err := s.updateJob("2", "7", change); err != nil {
+		t.Fatal(err)
+	}
+	cycle := saved["lifeCycle"].(map[string]any)
+	if cycle["start"] != json.Number("1720000000123") || cycle["end"] != json.Number("1730000000456") {
+		t.Fatalf("lifeCycle changed precision: %#v", cycle)
+	}
+}
+
+func TestUpdateJobAcceptsEquivalentDoubleResponse(t *testing.T) {
+	var saved bool
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/job/list":
+			value := "0.0"
+			if saved {
+				value = "1.0"
+			}
+			fmt.Fprintf(w, `{"success":true,"data":{"data":[{"id":7,"appId":2,"enable":true,"jobName":"demo","processorInfo":"foo","executeType":"STANDALONE","processorType":"BUILT_IN","timeExpressionType":"CRON","minCpuCores":%s}]}}`, value)
+		case "/job/save":
+			var body map[string]any
+			decoder := json.NewDecoder(r.Body)
+			decoder.UseNumber()
+			if err := decoder.Decode(&body); err != nil {
+				t.Error(err)
+			}
+			if body["minCpuCores"] != json.Number("1") {
+				t.Errorf("unexpected value: %v", body["minCpuCores"])
+			}
+			saved = true
+			fmt.Fprint(w, `{"success":true,"data":7}`)
+		default:
+			t.Errorf("unexpected route: %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+	s := &session{baseURL: server.URL, client: server.Client()}
+	if err := s.updateJob("2", "7", map[string]any{"minCpuCores": json.Number("1")}); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestDisableJobUsesNarrowRoute(t *testing.T) {
 	var calls []string
 	enabled := true

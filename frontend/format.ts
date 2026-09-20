@@ -62,6 +62,18 @@ export function dateLabel(value: unknown, locale: Locale): string {
   return Number.isNaN(date.getTime()) ? label(value) : date.toLocaleString(locale);
 }
 
+export function jobDateLabel(value: unknown, locale: Locale): string {
+  if (value === null || value === undefined || value === "") return "—";
+  const raw = String(value);
+  const date = new Date(/^\d+$/.test(raw) ? Number(raw) : raw);
+  return Number.isNaN(date.getTime())
+    ? label(value)
+    : new Intl.DateTimeFormat(locale, {
+        year: "numeric", month: "2-digit", day: "2-digit",
+        hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
+      }).format(date);
+}
+
 export function isFailedNormalInstance(value: unknown, type: InstanceType): boolean {
   return type === "NORMAL" && statusKeys.NORMAL[String(value).toUpperCase()] === "instanceFailed";
 }
@@ -75,7 +87,10 @@ export const jobFields: [string, TranslationKey][] = [
   ["maxInstanceNum", "maxInstanceNum"], ["concurrency", "concurrency"],
   ["instanceTimeLimit", "instanceTimeLimit"], ["instanceRetryNum", "instanceRetryNum"],
   ["taskRetryNum", "taskRetryNum"], ["dispatchStrategy", "dispatchStrategy"],
+  ["dispatchStrategyConfig", "dispatchStrategyConfig"],
+  ["minCpuCores", "minCpuCores"], ["minMemorySpace", "minMemorySpace"], ["minDiskSpace", "minDiskSpace"],
   ["designatedWorkers", "designatedWorkers"], ["maxWorkerCount", "maxWorkerCount"],
+  ["tag", "tag"], ["extra", "extra"],
   ["lifeCycle", "lifeCycle"], ["alarmConfig", "alarmConfig"],
   ["logConfig", "logConfig"], ["advancedRuntimeConfig", "advancedRuntimeConfig"],
   ["gmtCreate", "gmtCreate"], ["gmtModified", "gmtModified"],

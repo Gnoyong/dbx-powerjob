@@ -19,7 +19,8 @@
       "options": {
         "cwd": "${workspaceFolder}",
         "env": {
-          "GOCACHE": "${workspaceFolder}/backend/.go-cache"
+          "GOCACHE": "${workspaceFolder}/backend/.go-cache",
+          "PATH": "C:\\Program Files\\Go\\bin;${env:PATH}"
         }
       },
       "dependsOn": "构建插件前端",

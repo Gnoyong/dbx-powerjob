@@ -89,7 +89,7 @@ func (p *plugin) Handle(_ dbxpluginsdk.RequestContext, method string, params jso
 			return nil, dbxpluginsdk.NewError(-32000, err.Error())
 		}
 		return result, nil
-	case "powerjob/setJobEnabled", "powerjob/retryFailedInstance", "powerjob/runJob":
+	case "powerjob/updateJob", "powerjob/setJobEnabled", "powerjob/retryFailedInstance", "powerjob/runJob":
 		id, _ := values["connectionId"].(string)
 		p.mu.RLock()
 		s := p.sessions[id]
