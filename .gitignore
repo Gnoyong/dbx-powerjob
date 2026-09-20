@@ -1,4 +1,7 @@
 /dist/
+/node_modules/
+/.pnpm-store/
+/.ui-preview/
 /.dbx-dev/
 /backend/.go-cache/
 /backend/.go-mod-cache/

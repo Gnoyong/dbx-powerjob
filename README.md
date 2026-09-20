@@ -1,6 +1,6 @@
 # DBX PowerJob 只读插件
 
-基于 [DBX 插件开发规范](https://dbxio.com/en/docs/plugin-development) 的 Go sidecar + 工作台插件。当前版本 `0.1.5` 只查询 PowerJob 控制台使用的 Web API，不调用 PowerJob `/openApi`，也不提供启动、停止、修改或删除操作。
+基于 [DBX 插件开发规范](https://dbxio.com/en/docs/plugin-development) 的 Go sidecar + React/TypeScript 工作台插件。当前版本 `0.1.5` 只查询 PowerJob 控制台使用的 Web API，不调用 PowerJob `/openApi`，也不提供启动、停止、修改或删除操作。
 
 ## 功能
 
@@ -37,16 +37,26 @@ PowerJob Web API 不是稳定公开契约。升级 PowerJob 后应重新验证�
 - **仅用于本机开发验证**：在 DBX「插件中心」显式启用 **Allow unsigned development packages**，再导入本地 `.dbxp`。只对确认来源的本地候选包使用，测试后关闭该选项。此设置不会改变官方 Marketplace 的签名验证。
 - **正式发布**：先确定稳定的插件 ID 和 publisher（当前 `local.powerjob.readonly` / `local` 是开发阶段占位值），把源码放入插件自己的 GitHub 仓库，创建版本标签和 Release。现有 `.github/workflows/plugin-release.yml` 会为支持的平台构建未签名候选包与 `release-candidates.json`。按 [DBX 官方发布流程](https://dbxio.com/en/docs/plugin-development#complete-official-marketplace-flow) 向 `t8y2/dbx-store` 提交候选信息；维护者审核后由受保护的 DBX Store 工作流签名，再下载签名后的包安装。插件作者不能自行获得官方私钥，也不能通过修改 Manifest 使当前候选包变成可信包。
 
-当前目录尚未初始化 Git 仓库，也没有源码 Release，因此正式签名流程尚未开始。
+当前仓库没有经过 DBX Store 签名的正式包，因此正式签名流程尚未完成。
 
 ## 开发与验证
 
-使用官方 CLI（Node.js 22+、Go 1.22+）：
+使用 Node.js 22+、pnpm 11、Go 1.22+。`frontend/` 保存 React/TypeScript 源码，`ui/` 是 Vite 生成的静态文件，Manifest 仍以 `ui/index.html` 为入口。Vite 使用相对资源路径，运行时不依赖开发服务器或 CDN。
+
+```powershell
+pnpm install --frozen-lockfile
+pnpm run build
+```
+
+官方 CLI 的开发模式会调用 `dbx-plugin.toml` 中的 `ui_build` / `ui_watch`；正式候选包也应先构建前端：
 
 ```powershell
 pnpm dlx @dbx-app/plugin-cli dev --path . --port 5190
+pnpm run build
 pnpm dlx @dbx-app/plugin-cli package .
 ```
+
+`pnpm run typecheck` 可以单独检查 TypeScript。Release 工作流会先安装锁定依赖、构建前端，再调用 DBX 打包命令；该流程生成的候选包仍未签名。
 
 调试器会把开发连接凭据明文保存在 `.dbx-dev/`，该目录已忽略，使用后应删除。仓库文件不包含实例密码。
 
@@ -55,7 +65,8 @@ pnpm dlx @dbx-app/plugin-cli package .
 ```powershell
 Set-Location backend
 $env:GOCACHE = Join-Path (Get-Location) '.go-cache'
+$env:GO111MODULE = 'off'
 go test client.go read.go read_test.go
 ```
 
-测试覆盖只读路径白名单、应用敏感字段过滤、JWT 请求头、大整数实例 ID 和请求前参数校验。完整 sidecar 构建由上述官方 CLI 打包命令验证。
+测试覆盖只读路径白名单、应用敏感字段过滤、JWT 请求头、大整数实例 ID 和请求前参数校验。此命令只测试不依赖 SDK 的 Go 文件；完整 sidecar 构建由官方 CLI 使用其随包 SDK 验证。

@@ -5,5 +5,9 @@ language = "go"
 directory = "backend"
 binary = "dbx-plugin-powerjob-plugin"
 
+[dev]
+ui_build = ["node", "--eval", "import('./scripts/build-ui.mjs')"]
+ui_watch = ["node", "--eval", "import('./scripts/watch-ui.mjs')"]
+
 [package]
 include = ["assets", "ui"]

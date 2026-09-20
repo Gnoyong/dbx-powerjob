@@ -1,7 +1,4 @@
-(() => {
-  "use strict";
-
-  const dictionaries = {
+export const dictionaries = {
     en: {
       title: "PowerJob Read Only", app: "Application", previousApp: "Previous applications", nextApp: "Next applications",
       readonly: "Read only", refresh: "Refresh", jobList: "Job list", resizeJobsPane: "Resize job list", jobs: "Jobs", jobKeyword: "Job keyword",
@@ -72,24 +69,13 @@
     },
   };
 
-  let locale = "en";
-  const normalize = (value) => /^zh(?:-|$)/i.test(value || "") ? "zh-CN" : "en";
-  const t = (key, vars = {}) => {
-    const template = dictionaries[locale][key] ?? dictionaries.en[key] ?? key;
-    return template.replace(/\{(\w+)\}/g, (_, name) => String(vars[name] ?? ""));
-  };
-  function setLocale(value) {
-    const next = normalize(value);
-    if (next === locale) return false;
-    locale = next;
-    return true;
-  }
-  function applyStatic() {
-    document.documentElement.lang = locale;
-    document.title = t("title");
-    for (const node of document.querySelectorAll("[data-i18n]")) node.textContent = t(node.dataset.i18n);
-    for (const node of document.querySelectorAll("[data-i18n-placeholder]")) node.setAttribute("placeholder", t(node.dataset.i18nPlaceholder));
-    for (const node of document.querySelectorAll("[data-i18n-aria-label]")) node.setAttribute("aria-label", t(node.dataset.i18nAriaLabel));
-  }
-  window.powerjobI18n = { t, setLocale, applyStatic, getLocale: () => locale, dictionaries };
-})();
+
+export type Locale = "en" | "zh-CN";
+export type TranslationKey = keyof typeof dictionaries.en;
+export function normalizeLocale(value: string | undefined): Locale {
+  return /^zh(?:-|$)/i.test(value || "") ? "zh-CN" : "en";
+}
+export function translate(locale: Locale, key: TranslationKey, vars: Record<string, string | number> = {}): string {
+  const template: string = dictionaries[locale][key] ?? dictionaries.en[key] ?? key;
+  return template.replace(/\{(\w+)\}/g, (_, name: string) => String(vars[name] ?? ""));
+}
