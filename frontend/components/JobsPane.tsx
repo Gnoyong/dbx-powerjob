@@ -1,6 +1,5 @@
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
-import type { FormEvent } from "react";
 import { label } from "../format";
 import type { TranslationKey } from "../i18n";
 import type { Job, Page } from "../types";
@@ -25,7 +24,7 @@ export function JobsPane({
   draftKeyword: string;
   selectedJobId: string;
   onDraftKeywordChange: (value: string) => void;
-  onSearch: (event: FormEvent) => void;
+  onSearch: () => void;
   onChooseJob: (job: Job) => void;
   onPage: (index: number) => void;
   t: T;
@@ -38,9 +37,9 @@ export function JobsPane({
     >
       <div className="pane-bar">
         <strong>{t("jobs")}</strong>
-        <form
+        <div
           className="search-form"
-          onSubmit={onSearch}
+          role="search"
         >
           <label
             htmlFor="job-keyword"
@@ -55,14 +54,21 @@ export function JobsPane({
             maxLength={100}
             value={draftKeyword}
             onChange={(event) => onDraftKeywordChange(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                onSearch();
+              }
+            }}
           />
           <Button
-            type="submit"
+            type="button"
             variant="secondary"
+            onClick={onSearch}
           >
             {t("search")}
           </Button>
-        </form>
+        </div>
       </div>
       <div
         className="jobs-list"

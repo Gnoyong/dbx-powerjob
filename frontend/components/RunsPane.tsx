@@ -1,7 +1,6 @@
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { NativeSelect, NativeSelectOption } from "./ui/native-select";
-import type { FormEvent } from "react";
 import { dateLabel, label } from "../format";
 import type { Locale, TranslationKey } from "../i18n";
 import type { Instance, InstanceType, Page } from "../types";
@@ -30,7 +29,7 @@ export function RunsPane({
   selectedJobId: string;
   onDraftInstanceIdChange: (value: string) => void;
   onDraftTypeChange: (value: InstanceType) => void;
-  onSearch: (event: FormEvent) => void;
+  onSearch: () => void;
   onChooseInstance: (instance: Instance) => void;
   onOpenInstance: (instance: Instance) => void;
   onPage: (index: number) => void;
@@ -41,19 +40,25 @@ export function RunsPane({
       <div className="instances-pane">
         <div className="sub-pane-bar">
           <strong>{t("jobInstances")}</strong>
-          <form className="instance-filter" onSubmit={onSearch}>
+          <div className="instance-filter" role="search">
             <label htmlFor="instance-id" className="sr-only">{t("instanceId")}</label>
             <Input id="instance-id" inputMode="numeric" placeholder={t("instanceId")}
               value={draftInstanceId}
-              onChange={(event) => onDraftInstanceIdChange(event.target.value)} />
+              onChange={(event) => onDraftInstanceIdChange(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  onSearch();
+                }
+              }} />
             <label htmlFor="instance-type" className="sr-only">{t("instanceType")}</label>
             <NativeSelect id="instance-type" value={draftType}
               onChange={(event) => onDraftTypeChange(event.target.value as InstanceType)}>
               <NativeSelectOption value="NORMAL">{t("normalJob")}</NativeSelectOption>
               <NativeSelectOption value="WORKFLOW">{t("workflow")}</NativeSelectOption>
             </NativeSelect>
-            <Button type="submit" variant="secondary">{t("search")}</Button>
-          </form>
+            <Button type="button" variant="secondary" onClick={onSearch}>{t("search")}</Button>
+          </div>
         </div>
         <div className="instances-table-scroll">
           <table className="instances-table">

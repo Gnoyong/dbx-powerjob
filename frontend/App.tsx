@@ -1,6 +1,5 @@
 import { Button } from "./components/ui/button";
 import { useEffect, useRef, useState } from "react";
-import type { FormEvent } from "react";
 import { label } from "./format";
 import { getHost, invoke } from "./host";
 import { normalizeLocale, translate } from "./i18n";
@@ -272,15 +271,13 @@ export default function App() {
           ? "jobsFailed"
           : "";
 
-  function searchJobs(event: FormEvent) {
-    event.preventDefault();
+  function searchJobs() {
     setJobsIndex(0);
     const next = draftKeyword.trim();
     if (next === keyword && jobsIndex === 0) setRefresh((value) => value + 1);
     else setKeyword(next);
   }
-  function searchInstances(event: FormEvent) {
-    event.preventDefault();
+  function searchInstances() {
     setInstanceIndex(0);
     setFilter({ type: draftType, instanceId: draftInstanceId.trim() });
   }
