@@ -16,12 +16,18 @@ import type { T } from "./uiTypes";
 import { Toolbar } from "./components/Toolbar";
 import { JobsPane } from "./components/JobsPane";
 import { RunsPane } from "./components/RunsPane";
-import { Splitter } from "./components/Splitter";
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "./components/ui/resizable";
+import type { PanelSize } from "react-resizable-panels";
 import { JobInspector } from "./components/JobInspector";
 import { InstanceDialog } from "./components/InstanceDialog";
 
 type Tab = "detail" | "runs";
 type Filter = { type: InstanceType; instanceId: string };
+const jobsPaneStorageKey = "local.powerjob.readonly.jobs-pane-width";
 
 function actionErrorKey(error: unknown): TranslationKey | null {
   const message = error instanceof Error ? error.message : "";
@@ -78,6 +84,16 @@ export default function App() {
   const [actionError, setActionError] = useState<TranslationKey | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
   const actionPending = useRef(false);
+  const [savedJobsWidth] = useState(() => {
+    try {
+      const raw = localStorage.getItem(jobsPaneStorageKey);
+      const value = raw === null ? NaN : Number(raw);
+      return Number.isFinite(value) && value >= 240 ? value : null;
+    } catch {
+      return null;
+    }
+  });
+  const jobsWidth = useRef(savedJobsWidth ?? 0);
   const currentScope = useRef("");
   currentScope.current = `${connectionId}:${appId}`;
   const [appsRefresh, setAppsRefresh] = useState(0);
@@ -490,94 +506,130 @@ export default function App() {
         </div>
       )} */}
       <main className="workspace">
-        <JobsPane
-          jobs={jobs}
-          loading={jobsLoading}
-          status={jobsStatus}
-          draftKeyword={draftKeyword}
-          selectedJobId={selectedJobId}
-          onDraftKeywordChange={setDraftKeyword}
-          onSearch={searchJobs}
-          onChooseJob={chooseJob}
-          onSetJobEnabled={setJobEnabled}
-          busy={actionBusy}
-          onPage={setJobsIndex}
-          t={t}
-        />
-        <Splitter t={t} />
-        <section
-          id="detail-pane"
-          className="detail-pane"
-          aria-label={t("jobWorkspace")}
+        <ResizablePanelGroup
+          id="workspace-panel-group"
+          className="workspace-panel-group"
+          orientation="horizontal"
+          onLayoutChanged={(_layout, meta) => {
+            if (!meta.isUserInteraction || jobsWidth.current <= 0) return;
+            try {
+              localStorage.setItem(
+                jobsPaneStorageKey,
+                String(Math.round(jobsWidth.current)),
+              );
+            } catch {
+              /* sandboxed host */
+            }
+          }}
         >
-          <div className="detail-bar">
-            <strong>
-              {selectedJob
-                ? `${label(selectedJob.jobName)}  ·  #${selectedJob.id}`
-                : t("selectJob")}
-            </strong>
-            <nav
-              className="detail-tabs"
-              aria-label={t("jobInfo")}
-            >
-              <Button
-                type="button"
-                className={tab === "detail" ? "active" : ""}
-                aria-current={tab === "detail" ? "page" : undefined}
-                onClick={() => setTab("detail")}
-              >
-                {t("jobDetail")}
-              </Button>
-              <Button
-                type="button"
-                className={tab === "runs" ? "active" : ""}
-                aria-current={tab === "runs" ? "page" : undefined}
-                onClick={() => setTab("runs")}
-              >
-                {t("runsAndLogs")}
-              </Button>
-            </nav>
-          </div>
-          <section
-            className="job-detail-view"
-            aria-label={t("jobDetail")}
-            hidden={tab !== "detail"}
+          <ResizablePanel
+            id="jobs-panel"
+            className="workspace-panel"
+            minSize={240}
+            defaultSize={
+              savedJobsWidth ?? (window.innerWidth <= 800 ? "36%" : "30%")
+            }
+            groupResizeBehavior="preserve-pixel-size"
+            onResize={(size: PanelSize) => {
+              jobsWidth.current = size.inPixels;
+            }}
           >
-            <JobInspector
-              detail={
-                detail && String(detail.id) === selectedJobId
-                  ? { ...detail, enable: selectedJob?.enable ?? detail.enable }
-                  : null
-              }
-              status={detailStatus}
+            <JobsPane
+              jobs={jobs}
+              loading={jobsLoading}
+              status={jobsStatus}
+              draftKeyword={draftKeyword}
+              selectedJobId={selectedJobId}
+              onDraftKeywordChange={setDraftKeyword}
+              onSearch={searchJobs}
+              onChooseJob={chooseJob}
+              onSetJobEnabled={setJobEnabled}
+              busy={actionBusy}
+              onPage={setJobsIndex}
               t={t}
             />
-          </section>
-          <RunsPane
-            visible={tab === "runs"}
-            instances={instances}
-            loading={instancesLoading}
-            status={instancesStatus}
-            draftInstanceId={draftInstanceId}
-            draftType={draftType}
-            filterType={filter.type}
-            selectedInstanceId={selectedInstanceId}
-            locale={locale}
-            connectionId={connectionId || ""}
-            appId={appId}
-            selectedJobId={selectedJobId}
-            onDraftInstanceIdChange={setDraftInstanceId}
-            onDraftTypeChange={setDraftType}
-            onSearch={searchInstances}
-            onChooseInstance={chooseInstance}
-            onOpenInstance={setModal}
-            onRetryInstance={retryFailedInstance}
-            busy={actionBusy}
-            logRefresh={instancesRefresh}
-            onPage={setInstanceIndex}
-            t={t}
-          />
-        </section>
+          </ResizablePanel>
+          <ResizableHandle withHandle aria-label={t("resizeJobsPane")} />
+          <ResizablePanel
+            id="details-panel"
+            className="workspace-panel"
+            minSize={220}
+          >
+            <section
+              id="detail-pane"
+              className="detail-pane"
+              aria-label={t("jobWorkspace")}
+            >
+              <div className="detail-bar">
+                <strong>
+                  {selectedJob
+                    ? `${label(selectedJob.jobName)}  ·  #${selectedJob.id}`
+                    : t("selectJob")}
+                </strong>
+                <nav
+                  className="detail-tabs"
+                  aria-label={t("jobInfo")}
+                >
+                  <Button
+                    type="button"
+                    className={tab === "detail" ? "active" : ""}
+                    aria-current={tab === "detail" ? "page" : undefined}
+                    onClick={() => setTab("detail")}
+                  >
+                    {t("jobDetail")}
+                  </Button>
+                  <Button
+                    type="button"
+                    className={tab === "runs" ? "active" : ""}
+                    aria-current={tab === "runs" ? "page" : undefined}
+                    onClick={() => setTab("runs")}
+                  >
+                    {t("runsAndLogs")}
+                  </Button>
+                </nav>
+              </div>
+              <section
+                className="job-detail-view"
+                aria-label={t("jobDetail")}
+                hidden={tab !== "detail"}
+              >
+                <JobInspector
+                  detail={
+                    detail && String(detail.id) === selectedJobId
+                      ? { ...detail, enable: selectedJob?.enable ?? detail.enable }
+                      : null
+                  }
+                  status={detailStatus}
+                  t={t}
+                />
+              </section>
+              <RunsPane
+                visible={tab === "runs"}
+                instances={instances}
+                loading={instancesLoading}
+                status={instancesStatus}
+                draftInstanceId={draftInstanceId}
+                draftType={draftType}
+                filterType={filter.type}
+                selectedInstanceId={selectedInstanceId}
+                locale={locale}
+                connectionId={connectionId || ""}
+                appId={appId}
+                selectedJobId={selectedJobId}
+                onDraftInstanceIdChange={setDraftInstanceId}
+                onDraftTypeChange={setDraftType}
+                onSearch={searchInstances}
+                onChooseInstance={chooseInstance}
+                onOpenInstance={setModal}
+                onRetryInstance={retryFailedInstance}
+                busy={actionBusy}
+                logRefresh={instancesRefresh}
+                onPage={setInstanceIndex}
+                t={t}
+              />
+            </section>
+          </ResizablePanel>
+        </ResizablePanelGroup>
       </main>
       {modal && connectionId && (
         <InstanceDialog

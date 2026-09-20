@@ -1,7 +1,7 @@
 export const dictionaries = {
   en: {
     title: "PowerJob Workbench", app: "Application", previousApp: "Previous application", nextApp: "Next application",
-    readonly: "Job control", refresh: "Refresh", jobList: "Job list", resizeJobsPane: "Resize job list", jobs: "Jobs", jobKeyword: "Job keyword",
+    readonly: "Job control", refresh: "Refresh", jobList: "Job list", resizeJobsPane: "Resize job list", resizeLogsPane: "Resize log viewer height", jobs: "Jobs", jobKeyword: "Job keyword",
     enableJob: "Enable job", disableJob: "Disable job", retryFailed: "Retry",
     jobActions: "Job actions", jobContextHint: "Right-click for job actions",
     confirmEnableJob: "Enable job {name} (#{id})? Its schedule may start running.",
@@ -49,7 +49,7 @@ export const dictionaries = {
   },
   "zh-CN": {
     title: "PowerJob 工作台", app: "应用", previousApp: "上一个应用", nextApp: "下一个应用",
-    readonly: "任务操作", refresh: "刷新", jobList: "任务列表", resizeJobsPane: "调整任务栏宽度", jobs: "任务", jobKeyword: "任务关键字",
+    readonly: "任务操作", refresh: "刷新", jobList: "任务列表", resizeJobsPane: "调整任务栏宽度", resizeLogsPane: "调整日志区域高度", jobs: "任务", jobKeyword: "任务关键字",
     enableJob: "启用任务", disableJob: "停用任务", retryFailed: "重试",
     jobActions: "任务操作", jobContextHint: "右键打开任务操作菜单",
     confirmEnableJob: "确认启用任务 {name}（#{id}）？定时调度可能随即开始。",

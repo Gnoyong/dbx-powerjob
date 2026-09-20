@@ -165,11 +165,23 @@ button:focus-visible {
 }
 
 .workspace {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   flex: 1 1 auto;
-  grid-template-columns: minmax(240px, var(--jobs-pane-width, 30%)) 8px minmax(0, 1fr);
   min-height: 0;
   overflow: hidden;
+}
+
+.workspace-panel-group {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+}
+
+.workspace-panel,
+.jobs-pane,
+.detail-pane {
+  height: 100%;
 }
 
 .jobs-pane,
@@ -180,39 +192,6 @@ button:focus-visible {
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-}
-
-.pane-splitter {
-  position: relative;
-  cursor: col-resize;
-  touch-action: none;
-}
-
-.pane-splitter::before {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  /* left: 3px; */
-  width: 1px;
-  background: var(--color-border, #dce1e8);
-  content: "";
-}
-
-.pane-splitter:hover::before,
-.pane-splitter:focus-visible::before,
-.workspace.resizing .pane-splitter::before {
-  width: 2px;
-  background: var(--color-primary, #3565c8);
-}
-
-.pane-splitter:focus-visible {
-  outline: 2px solid var(--color-primary, #3565c8);
-  outline-offset: -2px;
-}
-
-.workspace.resizing {
-  cursor: col-resize;
-  user-select: none;
 }
 
 .pane-bar,
@@ -441,12 +420,66 @@ button:focus-visible {
 }
 
 .runs-view {
-  display: grid;
-  grid-template-rows: minmax(170px, 42%) minmax(150px, 1fr);
+  display: flex;
+  flex-direction: column;
 }
 
-.instances-pane {
-  border-bottom: 1px solid var(--color-border, #dce1e8);
+.runs-panel-group {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.runs-panel,
+.instances-pane,
+.logs-pane {
+  height: 100%;
+}
+
+.resizable-handle {
+  display: flex;
+  flex: 0 0 8px;
+  align-items: center;
+  justify-content: center;
+  touch-action: none;
+}
+
+.resizable-handle[aria-orientation="horizontal"] {
+  height: 8px;
+  cursor: row-resize;
+  border-top: 1px solid var(--color-border, #dce1e8);
+}
+
+.resizable-handle[aria-orientation="vertical"] {
+  width: 8px;
+  cursor: col-resize;
+  border-left: 1px solid var(--color-border, #dce1e8);
+}
+
+.resizable-handle:hover,
+.resizable-handle:focus-visible {
+  background: var(--color-muted, #eef1f5);
+}
+
+.resizable-handle:focus-visible {
+  outline: 2px solid var(--color-primary, #3565c8);
+  outline-offset: -2px;
+}
+
+.resizable-handle-grip {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 12px;
+  border: 1px solid var(--color-border, #dce1e8);
+  border-radius: 3px;
+  background: var(--color-background, #fff);
+  color: var(--color-muted-foreground, #677282);
+}
+
+.resizable-handle[aria-orientation="horizontal"] .resizable-handle-grip svg {
+  transform: rotate(90deg);
 }
 
 .sub-pane-bar {
@@ -700,10 +733,6 @@ h2 {
 }
 
 @media (max-width: 800px) {
-  .workspace {
-    grid-template-columns: minmax(240px, var(--jobs-pane-width, 36%)) 8px minmax(0, 1fr);
-  }
-
   .pane-bar {
     flex-wrap: wrap;
     padding: 5px 8px;
