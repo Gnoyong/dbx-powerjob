@@ -22,6 +22,10 @@ const statusKeys: Record<InstanceType, Record<string, TranslationKey>> = {
   },
 };
 
+export function instanceStatusOptions(type: InstanceType): string[] {
+  return Object.keys(statusKeys[type]).filter((value) => /^[A-Z_]+$/.test(value));
+}
+
 export function statusLabel(value: unknown, type: InstanceType, locale: Locale): string {
   const key = statusKeys[type][String(value).toUpperCase()];
   return key ? translate(locale, key) : label(value);

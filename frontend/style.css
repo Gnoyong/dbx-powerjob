@@ -32,7 +32,8 @@ body {
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
 }
 
@@ -70,7 +71,8 @@ button.ghost {
 }
 
 input,
-select {
+select,
+textarea {
   min-height: 28px;
   padding: 3px 7px;
   border: 1px solid var(--color-border, #cbd2dc);
@@ -82,6 +84,7 @@ select {
 
 input:focus,
 select:focus,
+textarea:focus,
 button:focus-visible {
   outline: 2px solid var(--color-primary, #3565c8);
   outline-offset: 1px;
@@ -484,11 +487,14 @@ button:focus-visible {
 
 .sub-pane-bar {
   min-height: 35px;
+  flex-wrap: wrap;
 }
 
 .instance-filter {
   gap: 5px;
   margin-left: auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .instance-filter input {
@@ -497,6 +503,10 @@ button:focus-visible {
 
 .instance-filter select {
   width: 94px;
+}
+
+.instance-filter #instance-status {
+  width: 120px;
 }
 
 .instances-table-scroll {
@@ -683,6 +693,19 @@ button:focus-visible {
   inset: 0;
   background: rgba(13, 24, 43, .4);
 }
+
+.run-job-dialog {
+  width: min(480px, calc(100vw - 24px));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.run-job-dialog p { margin: 0; }
+.run-job-dialog textarea { min-height: 90px; resize: vertical; }
+.run-job-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.run-job-error { color: var(--color-destructive, #b42318); }
 
 .dialog-head {
   gap: 10px;

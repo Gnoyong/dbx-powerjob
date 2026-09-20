@@ -172,11 +172,65 @@ func TestWriteRejectsInvalidInputBeforeRequest(t *testing.T) {
 		{"powerjob/setJobEnabled", map[string]any{"appId": "2", "jobId": "../../delete", "enabled": true}},
 		{"powerjob/retryFailedInstance", map[string]any{"appId": "0", "jobId": "7", "instanceId": "8"}},
 		{"powerjob/retryFailedInstance", map[string]any{"appId": "2", "jobId": "7", "instanceId": "bad"}},
+		{"powerjob/runJob", map[string]any{"appId": "2", "jobId": "bad", "instanceParams": "test"}},
+		{"powerjob/runJob", map[string]any{"appId": "2", "jobId": "7", "instanceParams": 123}},
+		{"powerjob/runJob", map[string]any{"appId": "2", "jobId": "7", "instanceParams": string(make([]byte, 4097))}},
 		{"powerjob/delete", map[string]any{"appId": "2"}},
 	} {
 		if _, err := s.write(tc.method, tc.params); err == nil {
 			t.Fatalf("accepted %s: %#v", tc.method, tc.params)
 		}
+	}
+}
+
+func TestRunJobUsesScopedQueryAndPreservesInstanceID(t *testing.T) {
+	const instanceID = "981965114838090752"
+	var runCalls int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("AppId") != "4" || r.Header.Get("PowerJwt") != "token" {
+			t.Error("missing scoped authorization headers")
+		}
+		switch r.URL.Path {
+		case "/job/list":
+			fmt.Fprint(w, `{"success":true,"data":{"data":[{"id":147,"appId":4,"enable":false}]}}`)
+		case "/job/run":
+			runCalls++
+			if r.Method != "GET" || r.URL.Query().Get("jobId") != "147" ||
+				r.URL.Query().Get("appId") != "4" || r.URL.Query().Get("instanceParams") != "a&b=测试" {
+				t.Errorf("unexpected run request: %s %s", r.Method, r.URL.String())
+			}
+			fmt.Fprintf(w, `{"success":true,"data":%s}`, instanceID)
+		default:
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+	s := &session{baseURL: server.URL, client: server.Client(), jwt: "token"}
+	result, err := s.write("powerjob/runJob", map[string]any{
+		"appId": "4", "jobId": "147", "instanceParams": "a&b=测试",
+	})
+	if err != nil || result.(map[string]any)["instanceId"] != instanceID || runCalls != 1 {
+		t.Fatalf("unexpected run result: %#v, %v, calls=%d", result, err, runCalls)
+	}
+}
+
+func TestRunJobRejectsWrongApplicationAndReadOnly(t *testing.T) {
+	var runCalls int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/job/run" {
+			runCalls++
+		}
+		fmt.Fprint(w, `{"success":true,"data":{"data":[{"id":147,"appId":5,"enable":true}]}}`)
+	}))
+	defer server.Close()
+	s := &session{baseURL: server.URL, client: server.Client()}
+	params := map[string]any{"appId": "4", "jobId": "147", "instanceParams": ""}
+	if _, err := s.write("powerjob/runJob", params); err == nil || runCalls != 0 {
+		t.Fatalf("wrong-app job was run: %v", err)
+	}
+	s.readOnly = true
+	if _, err := s.write("powerjob/runJob", params); err == nil || runCalls != 0 {
+		t.Fatalf("read-only job was run: %v", err)
 	}
 }
 

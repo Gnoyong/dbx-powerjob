@@ -4,7 +4,7 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { NativeSelect, NativeSelectOption } from "./ui/native-select";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "./ui/resizable";
-import { dateLabel, isFailedNormalInstance, label } from "../format";
+import { dateLabel, instanceStatusOptions, isFailedNormalInstance, label, statusLabel } from "../format";
 import type { Locale, TranslationKey } from "../i18n";
 import type { Instance, InstanceType, Page } from "../types";
 import type { T } from "../uiTypes";
@@ -19,6 +19,7 @@ export function RunsPane({
   status,
   draftInstanceId,
   draftType,
+  draftStatus,
   filterType,
   selectedInstanceId,
   locale,
@@ -27,6 +28,7 @@ export function RunsPane({
   selectedJobId,
   onDraftInstanceIdChange,
   onDraftTypeChange,
+  onDraftStatusChange,
   onSearch,
   onChooseInstance,
   onOpenInstance,
@@ -42,6 +44,7 @@ export function RunsPane({
   status: TranslationKey;
   draftInstanceId: string;
   draftType: InstanceType;
+  draftStatus: string;
   filterType: InstanceType;
   selectedInstanceId: string;
   locale: Locale;
@@ -50,6 +53,7 @@ export function RunsPane({
   selectedJobId: string;
   onDraftInstanceIdChange: (value: string) => void;
   onDraftTypeChange: (value: InstanceType) => void;
+  onDraftStatusChange: (value: string) => void;
   onSearch: () => void;
   onChooseInstance: (instance: Instance) => void;
   onOpenInstance: (instance: Instance) => void;
@@ -140,6 +144,22 @@ export function RunsPane({
                   <NativeSelectOption value="WORKFLOW">
                     {t("workflow")}
                   </NativeSelectOption>
+                </NativeSelect>
+                <label htmlFor="instance-status" className="sr-only">
+                  {t("status")}
+                </label>
+                <NativeSelect
+                  id="instance-status"
+                  aria-label={t("status")}
+                  value={draftStatus}
+                  onChange={(event) => onDraftStatusChange(event.target.value)}
+                >
+                  <NativeSelectOption value="">{t("allStatuses")}</NativeSelectOption>
+                  {instanceStatusOptions(draftType).map((value) => (
+                    <NativeSelectOption key={value} value={value}>
+                      {statusLabel(value, draftType, locale)}
+                    </NativeSelectOption>
+                  ))}
                 </NativeSelect>
                 <Button
                   type="button"

@@ -1,6 +1,6 @@
 # DBX PowerJob 工作台插件
 
-基于 [DBX 插件开发规范](https://dbxio.com/en/docs/plugin-development) 的 Go sidecar + React/TypeScript 工作台插件。使用 PowerJob 控制台 Web API，不调用 `/openApi`。除启用/停用任务及重跑失败普通实例外，其他功能只读；不提供任务删除、修改配置、立即运行或停止实例。
+基于 [DBX 插件开发规范](https://dbxio.com/en/docs/plugin-development) 的 Go sidecar + React/TypeScript 工作台插件。使用 PowerJob 控制台 Web API，不调用 `/openApi`。支持立即运行、启用/停用任务及重跑失败普通实例；其他功能只读。
 
 ## 功能
 
@@ -11,19 +11,20 @@
 | 执行实例列表 | `/instance/list` | POST |
 | 实例详情 | `/instance/detailPlus` | POST |
 | 实例日志 | `/instance/log` | GET |
+| 立即运行任务 | `/job/run?jobId=…&appId=…&instanceParams=…` | GET |
 | 停用任务 | `/job/disable` | GET |
 | 启用任务 | `/job/list` → `/job/save`（保持任务完整配置，仅将 `enable` 改为 `true`） | POST → POST |
 | 重跑失败普通实例 | `/instance/retry?instanceId=…&appId=…` | GET |
 
-登录使用 `/auth/thirdPartyLoginDirect`，并通过 `/auth/ifLogin` 验证会话。sidecar 只暴露表中列出的 RPC 方法，HTTP 路径在代码中固定；启停前重新查询目标的应用归属及状态，接口确认成功后再读一次状态验证，失败实例仅支持普通任务。操作需要账号相应的 PowerJob WRITE/OPS 权限，界面会二次确认并显示结果。应用列表响应会过滤掉 `password` 等未展示字段。任务和实例 ID 以字符串传递，避免浏览器处理大整数时丢失精度。
+登录使用 `/auth/thirdPartyLoginDirect`，并通过 `/auth/ifLogin` 验证会话。sidecar 只暴露表中列出的 RPC 方法，HTTP 路径在代码中固定；运行及启停前重新查询目标的应用归属，启停还会确认当前状态并在接口成功后再次验证，失败实例仅支持普通任务。操作需要账号相应的 PowerJob WRITE/OPS 权限，界面会确认并显示结果。应用列表响应会过滤掉 `password` 等未展示字段。任务和实例 ID 以字符串传递，避免浏览器处理大整数时丢失精度。
 
 ## 使用
 
-连接的默认主机是 `powerjob.prod.oceanwear.online`，端口为 `443`。在 DBX 中创建 PowerJob 连接，填写用户名、密码并测试连接，再从该连接打开「PowerJob 总览」。顶部切换应用；左栏任务只显示当前启用状态，右键任务可通过菜单启用或停用（键盘可用 Shift+F10 或菜单键）；右栏的「任务详情」展示配置，「实例与日志」在上方展示该任务的实例，在下方按滚动位置自动加载选中实例的日志。失败的普通任务实例可在表格中确认后重跑；实例表格也保留独立的实例详情入口。停用高频任务可能同时停止正在运行的实例；重跑可能重复产生业务效果。
+连接的默认主机是 `powerjob.prod.oceanwear.online`，端口为 `443`。在 DBX 中创建 PowerJob 连接，填写用户名、密码并测试连接，再从该连接打开「PowerJob 总览」。顶部切换应用；左栏任务只显示当前启用状态，右键任务可通过菜单运行、启用或停用（键盘可用 Shift+F10 或菜单键）。运行弹窗可填写实例参数，留空也会发送空参数；成功后显示实例 ID 并打开「实例与日志」。右栏的「任务详情」展示配置，「实例与日志」在上方展示该任务的实例，可按实例 ID、类型和状态筛选，在下方按滚动位置自动加载选中实例的日志。失败的普通任务实例可在表格中确认后重跑；实例表格也保留独立的实例详情入口。停用高频任务可能同时停止正在运行的实例；运行或重跑可能重复产生业务效果。
 
 在 DBX 侧边栏右键已连接的 PowerJob 连接，可点「查看应用」。插件读取第一页最多 8 个应用名称，由 DBX 以提示消息显示；应用更多时提示总数，完整列表仍在「PowerJob 总览」中查看。DBX 的 `context-menu` 是静态菜单项，不支持把应用动态展开为子菜单。未连接时会提示先连接。
 
-新建 DBX 连接默认可写。若沿用旧的「只读连接」，请在连接设置中取消勾选并重新连接；只读连接不会执行启停或重跑。开发宿主已保存的连接若从文件修改了该设置，需要重启开发宿主后重新连接。
+新建 DBX 连接默认可写。若沿用旧的「只读连接」，请在连接设置中取消勾选并重新连接；只读连接不会执行运行、启停或重跑。开发宿主已保存的连接若从文件修改了该设置，需要重启开发宿主后重新连接。
 
 拖动任务栏与详情栏之间的分隔线可调整栏宽；聚焦分隔线后也可使用左右方向键微调，Home/End 调至边界。宿主允许本地存储时，刷新后会保留栏宽。
 
@@ -66,6 +67,7 @@ pnpm dlx @dbx-app/plugin-cli package .
 ```
 
 `pnpm run dev` 使用项目内的 DBX 插件 CLI 启动浏览器开发宿主，并将 Go 构建缓存放在已忽略的 `backend/.go-cache/`。开发宿主默认使用 5190 端口，若被占用会选择空闲端口。
+`ui_watch` 只热更新前端。修改 `backend/` 中的 RPC 方法后，需要重启开发宿主；已安装的 DBX 插件还需要重新打包并安装新版本，否则前端可能报 `Method not found`。
 
 `pnpm run typecheck` 可以单独检查 TypeScript。Release 工作流会先安装锁定依赖、构建前端，再调用 DBX 打包命令；该流程生成的候选包仍未签名。
 

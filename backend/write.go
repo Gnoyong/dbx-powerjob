@@ -29,7 +29,7 @@ func (s *session) jobForAction(appID, jobID string) (map[string]any, error) {
 	return page.Data[0], nil
 }
 
-// write exposes only the three explicitly supported console operations.
+// write exposes only the explicitly supported console operations.
 func (s *session) write(method string, params map[string]any) (any, error) {
 	if s.readOnly {
 		return nil, errors.New("DBX connection is read-only; turn off Read-only connection before using job actions")
@@ -39,6 +39,29 @@ func (s *session) write(method string, params map[string]any) (any, error) {
 		return nil, err
 	}
 	switch method {
+	case "powerjob/runJob":
+		jobID, err := requiredID(params, "jobId")
+		if err != nil {
+			return nil, err
+		}
+		instanceParams, ok := params["instanceParams"].(string)
+		if !ok || len(instanceParams) > 4096 {
+			return nil, errors.New("invalid instance parameters")
+		}
+		if _, err := s.jobForAction(appID, jobID); err != nil {
+			return nil, err
+		}
+		data, err := s.request("GET", "/job/run", appID, url.Values{
+			"jobId": {jobID}, "appId": {appID}, "instanceParams": {instanceParams},
+		}, nil)
+		if err != nil {
+			return nil, err
+		}
+		var instanceID any
+		if err := decodeData(data, &instanceID); err != nil || !numericID.MatchString(asString(instanceID)) {
+			return nil, errors.New("PowerJob returned an unexpected instance ID")
+		}
+		return map[string]any{"instanceId": asString(instanceID)}, nil
 	case "powerjob/setJobEnabled":
 		jobID, err := requiredID(params, "jobId")
 		if err != nil {

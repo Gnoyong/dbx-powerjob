@@ -19,6 +19,7 @@ export function JobsPane({
   onSearch,
   onChooseJob,
   onSetJobEnabled,
+  onRunJob,
   busy,
   onPage,
   t,
@@ -32,6 +33,7 @@ export function JobsPane({
   onSearch: () => void;
   onChooseJob: (job: Job) => void;
   onSetJobEnabled: (job: Job) => void;
+  onRunJob: (job: Job) => void;
   busy: boolean;
   onPage: (index: number) => void;
   t: T;
@@ -73,7 +75,7 @@ export function JobsPane({
     if (busy || typeof job.enable !== "boolean") return;
     triggerRef.current = trigger;
     setMenu({ job, x: Math.max(4, Math.min(x, window.innerWidth - 180)),
-      y: Math.max(4, Math.min(y, window.innerHeight - 44)) });
+      y: Math.max(4, Math.min(y, window.innerHeight - 76)) });
   }
 
   return (
@@ -174,6 +176,13 @@ export function JobsPane({
           role="menu" aria-label={t("jobActions")}
           style={{ left: menu.x, top: menu.y }}>
           <button ref={menuItemRef} type="button" role="menuitem" disabled={busy}
+            onClick={() => {
+              setMenu(null);
+              onRunJob(menu.job);
+            }}>
+            {t("runJob")}
+          </button>
+          <button type="button" role="menuitem" disabled={busy}
             onClick={() => {
               setMenu(null);
               onSetJobEnabled(menu.job);

@@ -104,6 +104,56 @@ func TestLargeInstanceIDPreserved(t *testing.T) {
 	}
 }
 
+func TestInstanceStatusFilter(t *testing.T) {
+	var body map[string]any
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		if r.Method != http.MethodPost || r.URL.Path != "/instance/list" {
+			t.Errorf("unexpected outbound request: %s %s", r.Method, r.URL.Path)
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Error(err)
+		}
+		fmt.Fprint(w, `{"success":true,"data":{"index":0,"pageSize":20,"totalPages":0,"totalItems":0,"data":[]}}`)
+	}))
+	defer server.Close()
+
+	s := &session{baseURL: server.URL, client: server.Client()}
+	for _, tc := range []struct {
+		kind, status string
+	}{
+		{"NORMAL", "RUNNING"},
+		{"NORMAL", "FAILED"},
+		{"WORKFLOW", "RUNNING"},
+		{"WORKFLOW", "SUCCEED"},
+		{"NORMAL", ""},
+	} {
+		_, err := s.read("powerjob/instances", map[string]any{"appId": "2", "jobId": "7", "type": tc.kind, "status": tc.status})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if body["type"] != tc.kind || body["status"] != tc.status || body["jobId"] != "7" {
+			t.Errorf("filter not forwarded: %#v", body)
+		}
+	}
+	for _, tc := range []struct {
+		kind, status string
+	}{
+		{"NORMAL", "bogus"},
+		{"NORMAL", "3"},
+		{"WORKFLOW", "CANCELED"},
+	} {
+		before := requests
+		if _, err := s.read("powerjob/instances", map[string]any{"appId": "2", "type": tc.kind, "status": tc.status}); err == nil {
+			t.Errorf("accepted invalid %s status %q", tc.kind, tc.status)
+		}
+		if requests != before {
+			t.Errorf("invalid %s status %q made a request", tc.kind, tc.status)
+		}
+	}
+}
+
 func TestRejectInvalidIDsAndPaginationBeforeRequest(t *testing.T) {
 	s := &session{}
 	cases := []map[string]any{

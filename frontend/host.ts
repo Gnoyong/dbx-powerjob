@@ -9,6 +9,7 @@ type MethodResult = {
   "powerjob/log": LogPage;
   "powerjob/setJobEnabled": { success: boolean };
   "powerjob/retryFailedInstance": { success: boolean };
+  "powerjob/runJob": { instanceId: string };
 };
 
 type Context = { connectionId?: string } | null;

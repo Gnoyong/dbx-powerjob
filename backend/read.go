@@ -70,7 +70,15 @@ func (s *session) read(method string, params map[string]any) (any, error) {
 		if kind != "NORMAL" && kind != "WORKFLOW" {
 			return nil, errors.New("invalid instance type")
 		}
-		body := map[string]any{"appId": appID, "index": index, "pageSize": size, "type": kind, "status": ""}
+		status := asString(params["status"])
+		allowedStatuses := map[string]string{
+			"NORMAL": "WAITING_DISPATCH,WAITING_WORKER_RECEIVE,RUNNING,FAILED,SUCCEED,CANCELED,STOPPED",
+			"WORKFLOW": "WAITING,RUNNING,FAILED,SUCCEED,STOPPED",
+		}
+		if status != "" && !strings.Contains(","+allowedStatuses[kind]+",", ","+status+",") {
+			return nil, errors.New("invalid instance status")
+		}
+		body := map[string]any{"appId": appID, "index": index, "pageSize": size, "type": kind, "status": status}
 		for _, field := range []string{"jobId", "instanceId"} {
 			if asString(params[field]) != "" {
 				id, err := requiredID(params, field)

@@ -89,7 +89,7 @@ func (p *plugin) Handle(_ dbxpluginsdk.RequestContext, method string, params jso
 			return nil, dbxpluginsdk.NewError(-32000, err.Error())
 		}
 		return result, nil
-	case "powerjob/setJobEnabled", "powerjob/retryFailedInstance":
+	case "powerjob/setJobEnabled", "powerjob/retryFailedInstance", "powerjob/runJob":
 		id, _ := values["connectionId"].(string)
 		p.mu.RLock()
 		s := p.sessions[id]
@@ -110,7 +110,7 @@ func (p *plugin) Handle(_ dbxpluginsdk.RequestContext, method string, params jso
 func main() {
 	metadata := dbxpluginsdk.Metadata{
 		ID:           pluginID,
-		Version:      "0.1.11",
+		Version:      "0.1.13",
 		Capabilities: []string{"connections"},
 	}
 	server := dbxpluginsdk.NewServer(metadata, &plugin{sessions: make(map[string]*session)})

@@ -24,9 +24,10 @@ import {
 import type { PanelSize } from "react-resizable-panels";
 import { JobInspector } from "./components/JobInspector";
 import { InstanceDialog } from "./components/InstanceDialog";
+import { RunJobDialog } from "./components/RunJobDialog";
 
 type Tab = "detail" | "runs";
-type Filter = { type: InstanceType; instanceId: string };
+type Filter = { type: InstanceType; instanceId: string; status: string };
 const jobsPaneStorageKey = "local.powerjob.readonly.jobs-pane-width";
 
 function actionErrorKey(error: unknown): TranslationKey | null {
@@ -69,15 +70,20 @@ export default function App() {
   const [instanceIndex, setInstanceIndex] = useState(0);
   const [draftInstanceId, setDraftInstanceId] = useState("");
   const [draftType, setDraftType] = useState<InstanceType>("NORMAL");
+  const [draftStatus, setDraftStatus] = useState("");
   const [filter, setFilter] = useState<Filter>({
     type: "NORMAL",
     instanceId: "",
+    status: "",
   });
   const [instances, setInstances] = useState<Page<Instance> | null>(null);
   const [instancesStatus, setInstancesStatus] =
     useState<TranslationKey>("selectJobInstances");
   const [selectedInstanceId, setSelectedInstanceId] = useState("");
   const [modal, setModal] = useState<Instance | null>(null);
+  const [runTarget, setRunTarget] = useState<Job | null>(null);
+  const [runError, setRunError] = useState<TranslationKey | null>(null);
+  const [runInstanceId, setRunInstanceId] = useState("");
   const [refresh, setRefresh] = useState(0);
   const [instancesRefresh, setInstancesRefresh] = useState(0);
   const [actionStatus, setActionStatus] = useState<TranslationKey | null>(null);
@@ -98,6 +104,8 @@ export default function App() {
   currentScope.current = `${connectionId}:${appId}`;
   const [appsRefresh, setAppsRefresh] = useState(0);
   const appPageEdge = useRef<"first" | "last" | null>(null);
+
+  useEffect(() => { setRunTarget(null); }, [connectionId, appId]);
 
   useEffect(() => {
     let active = true;
@@ -281,6 +289,7 @@ export default function App() {
       pageSize: 20,
       type: filter.type,
       instanceId: filter.instanceId,
+      status: filter.status,
     })
       .then((page) => {
         if (!active) return;
@@ -333,7 +342,7 @@ export default function App() {
   }
   function searchInstances() {
     setInstanceIndex(0);
-    setFilter({ type: draftType, instanceId: draftInstanceId.trim() });
+    setFilter({ type: draftType, instanceId: draftInstanceId.trim(), status: draftStatus });
   }
   function chooseApp(next: string) {
     setAppId(next);
@@ -432,6 +441,46 @@ export default function App() {
     }
   }
 
+  async function runJob(instanceParams: string) {
+    if (!connectionId || !appId || !runTarget || actionPending.current) return;
+    const job = runTarget;
+    const scope = currentScope.current;
+    actionPending.current = true;
+    setActionBusy(true);
+    setRunError(null);
+    setActionStatus("runningJob");
+    setActionError(null);
+    try {
+      const result = await invoke(connectionId, "powerjob/runJob", {
+        appId, jobId: job.id, instanceParams,
+      });
+      if (currentScope.current === scope) {
+        setRunInstanceId(result.instanceId);
+        setActionStatus("jobRunRequested");
+        setRunTarget(null);
+        setSelectedJobId(String(job.id));
+        setInstanceIndex(0);
+        setDraftInstanceId("");
+        setDraftType("NORMAL");
+        setDraftStatus("");
+        setFilter({ type: "NORMAL", instanceId: "", status: "" });
+        setSelectedInstanceId("");
+        setTab("runs");
+        setInstancesRefresh((value) => value + 1);
+      }
+    } catch (error) {
+      if (currentScope.current === scope) {
+        const key = actionErrorKey(error) ?? "runJobFailed";
+        setRunError(key);
+        setActionStatus("runJobFailed");
+        setActionError(actionErrorKey(error));
+      }
+    } finally {
+      actionPending.current = false;
+      setActionBusy(false);
+    }
+  }
+
   async function retryFailedInstance(instance: Instance) {
     if (
       !connectionId ||
@@ -499,12 +548,12 @@ export default function App() {
           {t(message)}
         </div>
       )}
-      {/* {actionStatus && (
+      {actionStatus && (
         <div role="status" aria-live="polite"
-          className={`message ${actionStatus === "jobEnabled" || actionStatus === "jobDisabled" || actionStatus === "instanceRetried" ? "success" : ""}`}>
-          {t(actionStatus)}{actionError && ` ${t(actionError)}`}
+          className={`message ${actionStatus === "jobEnabled" || actionStatus === "jobDisabled" || actionStatus === "instanceRetried" || actionStatus === "jobRunRequested" ? "success" : ""}`}>
+          {t(actionStatus, { id: runInstanceId })}{actionError && ` ${t(actionError)}`}
         </div>
-      )} */}
+      )}
       <main className="workspace">
         <ResizablePanelGroup
           id="workspace-panel-group"
@@ -544,6 +593,10 @@ export default function App() {
               onSearch={searchJobs}
               onChooseJob={chooseJob}
               onSetJobEnabled={setJobEnabled}
+              onRunJob={(job) => {
+                setRunError(null);
+                setRunTarget(job);
+              }}
               busy={actionBusy}
               onPage={setJobsIndex}
               t={t}
@@ -610,6 +663,7 @@ export default function App() {
                 status={instancesStatus}
                 draftInstanceId={draftInstanceId}
                 draftType={draftType}
+                draftStatus={draftStatus}
                 filterType={filter.type}
                 selectedInstanceId={selectedInstanceId}
                 locale={locale}
@@ -617,7 +671,11 @@ export default function App() {
                 appId={appId}
                 selectedJobId={selectedJobId}
                 onDraftInstanceIdChange={setDraftInstanceId}
-                onDraftTypeChange={setDraftType}
+                onDraftTypeChange={(type) => {
+                  setDraftType(type);
+                  setDraftStatus("");
+                }}
+                onDraftStatusChange={setDraftStatus}
                 onSearch={searchInstances}
                 onChooseInstance={chooseInstance}
                 onOpenInstance={setModal}
@@ -642,6 +700,11 @@ export default function App() {
           onClose={() => setModal(null)}
           t={t}
         />
+      )}
+      {runTarget && (
+        <RunJobDialog key={`${appId}:${runTarget.id}`} job={runTarget}
+          busy={actionBusy} error={runError} onRun={runJob}
+          onClose={() => setRunTarget(null)} t={t} />
       )}
     </div>
   );
