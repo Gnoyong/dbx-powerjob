@@ -75,7 +75,7 @@ input:focus, select:focus, button:focus-visible {
 .workspace {
   display: grid;
   flex: 1 1 auto;
-  grid-template-columns: minmax(255px, 30%) minmax(0, 1fr);
+  grid-template-columns: minmax(240px, var(--jobs-pane-width, 30%)) 8px minmax(0, 1fr);
   min-height: 0;
   overflow: hidden;
 }
@@ -85,7 +85,22 @@ input:focus, select:focus, button:focus-visible {
   min-width: 0;
   min-height: 0;
 }
-.jobs-pane { border-right: 1px solid var(--color-border, #dce1e8); }
+.pane-splitter { position: relative; cursor: col-resize; touch-action: none; }
+.pane-splitter::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 1px;
+  background: var(--color-border, #dce1e8);
+  content: "";
+}
+.pane-splitter:hover::before, .pane-splitter:focus-visible::before, .workspace.resizing .pane-splitter::before {
+  width: 2px;
+  background: var(--color-primary, #3565c8);
+}
+.pane-splitter:focus-visible { outline: 2px solid var(--color-primary, #3565c8); outline-offset: -2px; }
+.workspace.resizing { cursor: col-resize; user-select: none; }
 .pane-bar, .detail-bar, .sub-pane-bar {
   flex: 0 0 auto;
   gap: 8px;

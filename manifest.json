@@ -3,7 +3,7 @@
   "manifest_version": 1,
   "id": "local.powerjob.readonly",
   "name": "PowerJob Read Only",
-  "version": "0.1.2",
+  "version": "0.1.5",
   "publisher": "local",
   "description": "Browse PowerJob applications, jobs, instances and logs without write actions.",
   "icon": "assets/plugin.svg",

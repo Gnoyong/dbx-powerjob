@@ -1,6 +1,6 @@
 # DBX PowerJob 只读插件
 
-基于 [DBX 插件开发规范](https://dbxio.com/en/docs/plugin-development) 的 Go sidecar + 工作台插件。当前版本 `0.1.2` 只查询 PowerJob 控制台使用的 Web API，不调用 PowerJob `/openApi`，也不提供启动、停止、修改或删除操作。
+基于 [DBX 插件开发规范](https://dbxio.com/en/docs/plugin-development) 的 Go sidecar + 工作台插件。当前版本 `0.1.5` 只查询 PowerJob 控制台使用的 Web API，不调用 PowerJob `/openApi`，也不提供启动、停止、修改或删除操作。
 
 ## 功能
 
@@ -17,6 +17,14 @@
 ## 使用
 
 连接的默认主机是 `powerjob.prod.oceanwear.online`，端口为 `443`。在 DBX 中创建 PowerJob 连接，填写用户名、密码并测试连接，再从该连接打开「PowerJob 总览」。顶部切换应用；左栏选择任务，右栏的「任务详情」展示配置，「实例与日志」在上方展示该任务的实例，在下方按滚动位置自动加载选中实例的日志。实例表格也保留独立的实例详情入口。
+
+拖动任务栏与详情栏之间的分隔线可调整栏宽；聚焦分隔线后也可使用左右方向键微调，Home/End 调至边界。宿主允许本地存储时，刷新后会保留栏宽。
+
+任务搜索支持点击 Search 或按回车提交。提交会回到第 1 页；翻页和刷新沿用最近一次提交的关键词，输入框中未提交的修改不会改变当前结果。
+
+工作台支持中文和英文，跟随 DBX 当前语言自动切换；切换时保留已选任务、实例和已加载日志。Manifest 中的连接表单与工作台入口使用 DBX 的本地化字段，工作台内部使用随包提供的词典。
+
+实例列表与详情中的状态数字按当前实例类型显示为中英文文字。普通任务与工作流的状态码分别依据 PowerJob 的 [InstanceStatus](https://github.com/PowerJob/PowerJob/blob/master/powerjob-common/src/main/java/tech/powerjob/common/enums/InstanceStatus.java) 和 [WorkflowInstanceStatus](https://github.com/PowerJob/PowerJob/blob/master/powerjob-common/src/main/java/tech/powerjob/common/enums/WorkflowInstanceStatus.java)；未知状态码保留原值。
 
 该实例目前使用无法通过标准校验的 TLS 证书。连接表单中的「跳过 TLS 证书校验」必须由使用者显式启用，默认关闭。启用后通信仍使用 HTTPS，但客户端无法确认服务器身份；应仅在可信网络中使用。修复服务器证书后请关闭该选项。
 

@@ -7,13 +7,13 @@
   const $ = (id) => document.getElementById(id);
   const state = {
     connectionId: "", appId: "", appsIndex: 0, apps: null,
-    jobsIndex: 0, jobs: null, selectedJob: null, jobDetail: null, detailTab: "detail",
-    instancesIndex: 0, instances: null, selectedInstance: null,
+    jobsIndex: 0, jobsKeyword: "", jobs: null, selectedJob: null, jobDetail: null, detailTab: "detail",
+    instancesIndex: 0, instancesType: "NORMAL", instances: null, selectedInstance: null,
     logNextIndex: 0, logTotalPages: null, logLoading: false, logAutoFill: 0,
     appStatus: "loading", appNameStatus: "loading", jobsStatus: "selectConnection",
     detailStatus: "selectJobDetail", instanceStatus: "selectJobDetail",
     logContentStatus: "selectInstanceLog", logStateStatus: "", messageKey: "",
-    modalStatus: "", modalInstanceId: "",
+    modalStatus: "", modalInstanceId: "", modalType: "NORMAL", modalResult: null,
     appSeq: 0, jobsSeq: 0, detailSeq: 0, instanceSeq: 0, logSeq: 0, modalSeq: 0,
   };
 
@@ -32,8 +32,31 @@
     ["gmtCreate", "gmtCreate"], ["gmtModified", "gmtModified"],
   ];
 
+  // PowerJob uses different status codes for job and workflow instances.
+  const instanceStatusKeys = {
+    NORMAL: {
+      1: "instanceWaitingDispatch", 2: "instanceWaitingWorker", 3: "instanceRunning",
+      4: "instanceFailed", 5: "instanceSucceeded", 9: "instanceCanceled", 10: "instanceStopped",
+      WAITING_DISPATCH: "instanceWaitingDispatch", WAITING_WORKER_RECEIVE: "instanceWaitingWorker",
+      RUNNING: "instanceRunning", FAILED: "instanceFailed", SUCCEED: "instanceSucceeded",
+      CANCELED: "instanceCanceled", STOPPED: "instanceStopped",
+    },
+    WORKFLOW: {
+      1: "workflowWaiting", 2: "instanceRunning", 3: "instanceFailed",
+      4: "instanceSucceeded", 10: "instanceStopped",
+      WAITING: "workflowWaiting", RUNNING: "instanceRunning", FAILED: "instanceFailed",
+      SUCCEED: "instanceSucceeded", STOPPED: "instanceStopped",
+    },
+  };
+
   function label(value) {
     return value === null || value === undefined || value === "" ? "—" : String(value);
+  }
+
+  function instanceStatusLabel(value, type) {
+    if (value === null || value === undefined || value === "") return label(value);
+    const key = instanceStatusKeys[type]?.[String(value).toUpperCase()];
+    return key ? t(key) : label(value);
   }
 
   function dateLabel(value) {
@@ -112,6 +135,7 @@
     state.detailSeq++;
     state.instanceSeq++;
     state.modalSeq++;
+    state.modalResult = null;
     if ($("instance-detail-dialog").open) $("instance-detail-dialog").close();
     state.selectedJob = null;
     state.jobDetail = null;
@@ -121,7 +145,7 @@
     $("job-detail-content").className = "detail-scroll empty-pane";
     state.detailStatus = "selectJobDetail";
     $("job-detail-content").textContent = t(state.detailStatus);
-    emptyInstances("selectJobDetail");
+    emptyInstances("selectJobInstances");
     pageControls("instances", null);
     resetLog();
   }
@@ -243,7 +267,7 @@
     message("");
     try {
       const result = await invoke("powerjob/jobs", {
-        appId, index: state.jobsIndex, pageSize: 20, keyword: $("job-keyword").value.trim(),
+        appId, index: state.jobsIndex, pageSize: 20, keyword: state.jobsKeyword,
       });
       if (serial !== state.jobsSeq || appId !== state.appId) return;
       state.jobs = result;
@@ -337,7 +361,7 @@
       tr.dataset.instanceId = String(instance.instanceId);
       tr.classList.toggle("selected", tr.dataset.instanceId === String(state.selectedInstance?.instanceId));
       tr.setAttribute("aria-selected", String(tr.classList.contains("selected")));
-      for (const value of [instance.instanceId, instance.status, dateLabel(instance.actualTriggerTime), dateLabel(instance.finishedTime)]) {
+      for (const value of [instance.instanceId, instanceStatusLabel(instance.status, state.instancesType), dateLabel(instance.actualTriggerTime), dateLabel(instance.finishedTime)]) {
         const td = document.createElement("td");
         td.textContent = label(value);
         tr.appendChild(td);
@@ -366,13 +390,15 @@
     const serial = ++state.instanceSeq;
     const appId = state.appId;
     const jobId = String(state.selectedJob.id);
+    const type = $("instance-type").value;
     emptyInstances("loadingInstances");
     try {
       const result = await invoke("powerjob/instances", {
         appId, jobId, index: state.instancesIndex, pageSize: 20,
-        type: $("instance-type").value, instanceId: $("instance-id").value.trim(),
+        type, instanceId: $("instance-id").value.trim(),
       });
       if (serial !== state.instanceSeq || appId !== state.appId || jobId !== String(state.selectedJob?.id)) return;
+      state.instancesType = type;
       state.instances = result;
       pageControls("instances", result);
       const selected = result.data?.find((item) => String(item.instanceId) === String(state.selectedInstance?.instanceId)) || result.data?.[0];
@@ -417,19 +443,24 @@
     state.logLoading = true;
     $("log-retry").hidden = true;
     $("log-more").hidden = true;
-    $("log-state").textContent = "加载中…";
+    state.logStateStatus = "loading";
+    $("log-state").textContent = t(state.logStateStatus);
     try {
       const result = await invoke("powerjob/log", { appId, instanceId, index });
       if (serial !== state.logSeq || instanceId !== String(state.selectedInstance?.instanceId) || appId !== state.appId) return;
       const content = $("log-content");
-      if (index === 0) content.replaceChildren();
+      if (index === 0) { content.replaceChildren(); state.logContentStatus = ""; }
       if (result.data) content.appendChild(document.createTextNode(result.data));
       state.logNextIndex = result.index + 1;
       state.logTotalPages = result.totalPages;
       state.logLoading = false;
       const more = state.logNextIndex < state.logTotalPages;
-      if (!content.textContent && !more) content.textContent = "本实例没有日志";
-      $("log-state").textContent = more ? `${state.logNextIndex} / ${state.logTotalPages} 页` : "已加载完";
+      if (!content.textContent && !more) {
+        state.logContentStatus = "noLogs";
+        content.textContent = t(state.logContentStatus);
+      }
+      state.logStateStatus = more ? "logPage" : "logComplete";
+      $("log-state").textContent = t(state.logStateStatus, { current: state.logNextIndex, total: state.logTotalPages });
       requestAnimationFrame(() => {
         if (serial !== state.logSeq || !more) return;
         const panel = $("log-scroll");
@@ -443,27 +474,153 @@
     } catch (error) {
       if (serial !== state.logSeq) return;
       state.logLoading = false;
-      $("log-state").textContent = error.message || "日志加载失败";
+      state.logStateStatus = "logFailed";
+      $("log-state").textContent = t(state.logStateStatus);
       $("log-retry").hidden = false;
-      if (index === 0) $("log-content").textContent = "日志加载失败";
+      if (index === 0) {
+        state.logContentStatus = "logFailed";
+        $("log-content").textContent = t(state.logContentStatus);
+      }
     }
   }
 
   async function showInstanceDetail(instance) {
     const serial = ++state.modalSeq;
     const dialog = $("instance-detail-dialog");
-    $("instance-detail-title").textContent = `实例 ${instance.instanceId}`;
-    $("instance-detail-content").textContent = "正在加载…";
+    state.modalInstanceId = String(instance.instanceId);
+    state.modalType = state.instancesType;
+    state.modalResult = null;
+    state.modalStatus = "loading";
+    $("instance-detail-title").textContent = t("instanceTitle", { id: state.modalInstanceId });
+    $("instance-detail-content").textContent = t(state.modalStatus);
     dialog.showModal();
     try {
       const result = await invoke("powerjob/instance", { appId: state.appId, instanceId: String(instance.instanceId) });
-      if (dialog.open && serial === state.modalSeq) $("instance-detail-content").textContent = JSON.stringify(result, null, 2);
+      if (dialog.open && serial === state.modalSeq) {
+        state.modalStatus = "";
+        state.modalResult = result;
+        renderInstanceDetail();
+      }
     } catch (error) {
-      if (dialog.open && serial === state.modalSeq) $("instance-detail-content").textContent = error.message || "实例详情加载失败";
+      if (dialog.open && serial === state.modalSeq) {
+        state.modalStatus = "instanceDetailFailed";
+        $("instance-detail-content").textContent = t(state.modalStatus);
+      }
     }
   }
 
+  function renderInstanceDetail() {
+    const result = state.modalResult;
+    if (!result) return;
+    const display = { ...result };
+    if (Object.hasOwn(display, "status")) display.status = instanceStatusLabel(display.status, state.modalType);
+    $("instance-detail-content").textContent = JSON.stringify(display, null, 2);
+  }
+
+  function updateLocale() {
+    if (!i18n.setLocale(host.locale)) return;
+    i18n.applyStatic();
+    if (state.appStatus) appPlaceholder(state.appStatus);
+    if (state.appNameStatus) $("app-name").textContent = t(state.appNameStatus);
+    message(state.messageKey);
+    pageControls("apps", state.appStatus ? null : state.apps);
+    pageControls("jobs", !state.jobsStatus || state.jobsStatus === "noJobs" ? state.jobs : null);
+    pageControls("instances", !state.instanceStatus || state.instanceStatus === "noInstances" ? state.instances : null);
+    const jobsScroll = $("jobs-list").scrollTop;
+    if (state.jobsStatus) emptyJobs(state.jobsStatus);
+    else renderJobs();
+    $("jobs-list").scrollTop = jobsScroll;
+    if (!state.selectedJob) $("selected-job-title").textContent = t("selectJob");
+    const detailScroll = $("job-detail-content").scrollTop;
+    if (state.detailStatus) $("job-detail-content").textContent = t(state.detailStatus);
+    else if (state.jobDetail) renderJobDetail(state.jobDetail);
+    $("job-detail-content").scrollTop = detailScroll;
+    const instancesScroll = $("instances-table-scroll").scrollTop;
+    if (state.instanceStatus) emptyInstances(state.instanceStatus);
+    else renderInstances();
+    $("instances-table-scroll").scrollTop = instancesScroll;
+    if (state.logContentStatus) $("log-content").textContent = t(state.logContentStatus);
+    if (state.logStateStatus) $("log-state").textContent = t(state.logStateStatus, {
+      current: state.logNextIndex, total: state.logTotalPages,
+    });
+    if ($("instance-detail-dialog").open) {
+      $("instance-detail-title").textContent = t("instanceTitle", { id: state.modalInstanceId });
+      if (state.modalStatus) $("instance-detail-content").textContent = t(state.modalStatus);
+      else renderInstanceDetail();
+    }
+  }
+
+  function setupPaneResize() {
+    const workspace = document.querySelector(".workspace");
+    const jobsPane = $("jobs-pane");
+    const splitter = $("pane-splitter");
+    const storageKey = "local.powerjob.readonly.jobs-pane-width";
+    const minJobs = 240;
+    const minDetail = 220;
+    const splitterWidth = 8;
+    let savedWidth;
+    try { savedWidth = Number(localStorage.getItem(storageKey)); } catch { savedWidth = NaN; }
+    let preferredWidth = Number.isFinite(savedWidth) && savedWidth >= minJobs
+      ? savedWidth : jobsPane.getBoundingClientRect().width;
+
+    function setWidth(requested, remember = false) {
+      const maxJobs = Math.max(minJobs, Math.floor(workspace.getBoundingClientRect().width) - splitterWidth - minDetail);
+      const width = Math.max(minJobs, Math.min(maxJobs, Math.round(requested)));
+      workspace.style.setProperty("--jobs-pane-width", `${width}px`);
+      splitter.setAttribute("aria-valuemin", String(minJobs));
+      splitter.setAttribute("aria-valuemax", String(maxJobs));
+      splitter.setAttribute("aria-valuenow", String(width));
+      if (remember) preferredWidth = width;
+      return width;
+    }
+
+    function saveWidth() {
+      try { localStorage.setItem(storageKey, String(preferredWidth)); } catch { /* Storage may be unavailable in a sandboxed iframe. */ }
+    }
+
+    setWidth(preferredWidth);
+    let pointerId = null;
+    let startX = 0;
+    let startWidth = 0;
+    splitter.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0 || pointerId !== null) return;
+      pointerId = event.pointerId;
+      startX = event.clientX;
+      startWidth = jobsPane.getBoundingClientRect().width;
+      splitter.setPointerCapture(pointerId);
+      workspace.classList.add("resizing");
+      event.preventDefault();
+    });
+    splitter.addEventListener("pointermove", (event) => {
+      if (event.pointerId === pointerId) setWidth(startWidth + event.clientX - startX, true);
+    });
+    const finish = (event) => {
+      if (event.pointerId !== pointerId) return;
+      pointerId = null;
+      workspace.classList.remove("resizing");
+      saveWidth();
+    };
+    splitter.addEventListener("pointerup", finish);
+    splitter.addEventListener("pointercancel", finish);
+    splitter.addEventListener("lostpointercapture", finish);
+    splitter.addEventListener("keydown", (event) => {
+      const current = jobsPane.getBoundingClientRect().width;
+      const step = event.shiftKey ? 40 : 16;
+      let next;
+      if (event.key === "ArrowLeft") next = current - step;
+      else if (event.key === "ArrowRight") next = current + step;
+      else if (event.key === "Home") next = minJobs;
+      else if (event.key === "End") next = workspace.getBoundingClientRect().width - splitterWidth - minDetail;
+      else return;
+      event.preventDefault();
+      setWidth(next, true);
+      saveWidth();
+    });
+    window.addEventListener("resize", () => setWidth(preferredWidth));
+  }
+
   function bind() {
+    setupPaneResize();
     $("refresh").addEventListener("click", () => { if (state.appId) loadJobs(); else if (state.connectionId) loadApps(); });
     $("app-select").addEventListener("change", (event) => {
       state.appId = event.target.value;
@@ -476,7 +633,14 @@
     });
     $("apps-prev").addEventListener("click", () => { if (state.appsIndex > 0) { state.appsIndex--; loadApps(); } });
     $("apps-next").addEventListener("click", () => { state.appsIndex++; loadApps(); });
-    $("jobs-search").addEventListener("submit", (event) => { event.preventDefault(); state.jobsIndex = 0; loadJobs(); });
+    const searchJobs = (event) => {
+      event.preventDefault();
+      state.jobsIndex = 0;
+      state.jobsKeyword = $("job-keyword").value.trim();
+      loadJobs();
+    };
+    $("jobs-search-button").addEventListener("click", searchJobs);
+    $("jobs-search").addEventListener("submit", searchJobs);
     $("jobs-prev").addEventListener("click", () => { if (state.jobsIndex > 0) { state.jobsIndex--; loadJobs(); } });
     $("jobs-next").addEventListener("click", () => { state.jobsIndex++; loadJobs(); });
     $("tab-detail").addEventListener("click", () => setDetailTab("detail"));
@@ -495,6 +659,8 @@
   function boot() {
     bind();
     host.ready.then(() => {
+      updateLocale();
+      window.addEventListener("dbx-plugin-env", updateLocale);
       let initialized = false;
       const updateContext = (context) => {
         const id = context?.connectionId || "";
@@ -504,22 +670,25 @@
         state.appId = "";
         state.appsIndex = 0;
         state.jobsIndex = 0;
+        state.jobsKeyword = "";
+        $("job-keyword").value = "";
         state.appSeq++;
         state.jobsSeq++;
         state.jobs = null;
         resetSelection();
-        emptyJobs(id ? "正在加载任务…" : "请先选择连接");
+        emptyJobs(id ? "loadingJobs" : "selectConnection");
         pageControls("jobs", null);
         if (id) loadApps();
         else {
-          appPlaceholder("请先选择连接");
-          $("app-name").textContent = "请先选择连接";
-          message("请先从 DBX 连接打开工作台。");
+          appPlaceholder("selectConnection");
+          state.appNameStatus = "selectConnection";
+          $("app-name").textContent = t(state.appNameStatus);
+          message("openFromConnection");
         }
       };
       updateContext(host.context);
       host.onContext(updateContext);
-    }).catch((error) => message(error.message || "DBX 插件主机初始化失败"));
+    }).catch(() => message("hostFailed"));
   }
 
   if (document.readyState === "loading") {

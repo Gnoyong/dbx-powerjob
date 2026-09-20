@@ -2,99 +2,344 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0"
+    />
     <title>PowerJob Read Only</title>
-    <link rel="stylesheet" href="./style.css" />
-    <script src="./i18n.js" defer></script>
-    <script src="./app.js" defer></script>
+    <link
+      rel="stylesheet"
+      href="./style.css"
+    />
+    <script
+      src="./i18n.js"
+      defer
+    ></script>
+    <script
+      src="./app.js"
+      defer
+    ></script>
   </head>
   <body>
     <div class="shell">
       <header class="toolbar">
         <div class="app-picker">
-          <label for="app-select" data-i18n="app">Application</label>
-          <select id="app-select"><option value="">Loading…</option></select>
-          <button id="apps-prev" type="button" class="ghost" data-i18n-aria-label="previousApp" aria-label="Previous applications">‹</button>
-          <span id="apps-page" class="page-label"></span>
-          <button id="apps-next" type="button" class="ghost" data-i18n-aria-label="nextApp" aria-label="Next applications">›</button>
+          <label
+            for="app-select"
+            data-i18n="app"
+            >Application</label
+          >
+          <select id="app-select">
+            <option value="">Loading…</option>
+          </select>
+          <button
+            id="apps-prev"
+            type="button"
+            class="ghost"
+            data-i18n-aria-label="previousApp"
+            aria-label="Previous applications"
+          >
+            ‹
+          </button>
+          <span
+            id="apps-page"
+            class="page-label"
+          ></span>
+          <button
+            id="apps-next"
+            type="button"
+            class="ghost"
+            data-i18n-aria-label="nextApp"
+            aria-label="Next applications"
+          >
+            ›
+          </button>
         </div>
         <div class="toolbar-actions">
-          <span class="readonly" data-i18n="readonly">Read only</span>
-          <button id="refresh" type="button" class="secondary" data-i18n="refresh">Refresh</button>
+          <span
+            class="readonly"
+            data-i18n="readonly"
+            >Read only</span
+          >
+          <button
+            id="refresh"
+            type="button"
+            class="secondary"
+            data-i18n="refresh"
+          >
+            Refresh
+          </button>
         </div>
       </header>
 
-      <span id="app-name" class="sr-only" aria-live="polite">Loading…</span>
-      <div id="message" role="status" class="message" hidden></div>
+      <span
+        id="app-name"
+        class="sr-only"
+        aria-live="polite"
+        >Loading…</span
+      >
+      <div
+        id="message"
+        role="status"
+        class="message"
+        hidden
+      ></div>
 
       <main class="workspace">
-        <section class="jobs-pane" data-i18n-aria-label="jobList" aria-label="Job list">
+        <section
+          id="jobs-pane"
+          class="jobs-pane"
+          data-i18n-aria-label="jobList"
+          aria-label="Job list"
+        >
           <div class="pane-bar">
             <strong data-i18n="jobs">Jobs</strong>
-            <form id="jobs-search" class="search-form">
-              <label for="job-keyword" class="sr-only" data-i18n="jobKeyword">Job keyword</label>
-              <input id="job-keyword" type="search" data-i18n-placeholder="searchJobs" placeholder="Search jobs" maxlength="100" />
-              <button type="submit" class="secondary" data-i18n="search">Search</button>
+            <form
+              id="jobs-search"
+              class="search-form"
+            >
+              <label
+                for="job-keyword"
+                class="sr-only"
+                data-i18n="jobKeyword"
+                >Job keyword</label
+              >
+              <input
+                id="job-keyword"
+                type="search"
+                data-i18n-placeholder="searchJobs"
+                placeholder="Search jobs"
+                maxlength="100"
+              />
+              <button
+                id="jobs-search-button"
+                type="button"
+                class="secondary"
+                data-i18n="search"
+              >
+                Search
+              </button>
             </form>
           </div>
-          <div id="jobs-list" class="jobs-list" role="list" data-i18n-aria-label="jobs" aria-label="Jobs"></div>
+          <div
+            id="jobs-list"
+            class="jobs-list"
+            role="list"
+            data-i18n-aria-label="jobs"
+            aria-label="Jobs"
+          ></div>
           <div class="pager jobs-pager">
             <span id="jobs-count"></span>
-            <button id="jobs-prev" type="button" class="ghost" data-i18n="previous">Previous</button>
+            <button
+              id="jobs-prev"
+              type="button"
+              class="ghost"
+              data-i18n="previous"
+            >
+              Previous
+            </button>
             <span id="jobs-page"></span>
-            <button id="jobs-next" type="button" class="ghost" data-i18n="next">Next</button>
+            <button
+              id="jobs-next"
+              type="button"
+              class="ghost"
+              data-i18n="next"
+            >
+              Next
+            </button>
           </div>
         </section>
 
-        <section class="detail-pane" data-i18n-aria-label="jobWorkspace" aria-label="Job workspace">
+        <div
+          id="pane-splitter"
+          class="pane-splitter"
+          role="separator"
+          tabindex="0"
+          aria-orientation="vertical"
+          aria-controls="jobs-pane detail-pane"
+          data-i18n-aria-label="resizeJobsPane"
+          aria-label="Resize job list"
+        ></div>
+
+        <section
+          id="detail-pane"
+          class="detail-pane"
+          data-i18n-aria-label="jobWorkspace"
+          aria-label="Job workspace"
+        >
           <div class="detail-bar">
             <strong id="selected-job-title">Select a job on the left</strong>
-            <nav class="detail-tabs" data-i18n-aria-label="jobInfo" aria-label="Job information">
-              <button id="tab-detail" type="button" class="active" aria-current="page" data-i18n="jobDetail">Job details</button>
-              <button id="tab-runs" type="button" data-i18n="runsAndLogs">Instances &amp; logs</button>
+            <nav
+              class="detail-tabs"
+              data-i18n-aria-label="jobInfo"
+              aria-label="Job information"
+            >
+              <button
+                id="tab-detail"
+                type="button"
+                class="active"
+                aria-current="page"
+                data-i18n="jobDetail"
+              >
+                Job details
+              </button>
+              <button
+                id="tab-runs"
+                type="button"
+                data-i18n="runsAndLogs"
+              >
+                Instances &amp; logs
+              </button>
             </nav>
           </div>
 
-          <section id="job-detail-view" class="job-detail-view" data-i18n-aria-label="jobDetail" aria-label="Job details">
-            <div id="job-detail-content" class="detail-scroll empty-pane">Select a job on the left to view details</div>
+          <section
+            id="job-detail-view"
+            class="job-detail-view"
+            data-i18n-aria-label="jobDetail"
+            aria-label="Job details"
+          >
+            <div
+              id="job-detail-content"
+              class="detail-scroll empty-pane"
+            >
+              Select a job on the left to view details
+            </div>
           </section>
 
-          <section id="job-runs-view" class="runs-view" data-i18n-aria-label="runsAndLogs" aria-label="Instances &amp; logs" hidden>
+          <section
+            id="job-runs-view"
+            class="runs-view"
+            data-i18n-aria-label="runsAndLogs"
+            aria-label="Instances &amp; logs"
+            hidden
+          >
             <div class="instances-pane">
               <div class="sub-pane-bar">
                 <strong data-i18n="jobInstances">Job instances</strong>
-                <form id="instances-search" class="instance-filter">
-                  <label for="instance-id" class="sr-only" data-i18n="instanceId">Instance ID</label>
-                  <input id="instance-id" inputmode="numeric" data-i18n-placeholder="instanceId" placeholder="Instance ID" />
-                  <label for="instance-type" class="sr-only" data-i18n="instanceType">Instance type</label>
-                  <select id="instance-type"><option value="NORMAL" data-i18n="normalJob">Normal job</option><option value="WORKFLOW" data-i18n="workflow">Workflow</option></select>
-                  <button type="submit" class="secondary" data-i18n="search">Search</button>
+                <form
+                  id="instances-search"
+                  class="instance-filter"
+                >
+                  <label
+                    for="instance-id"
+                    class="sr-only"
+                    data-i18n="instanceId"
+                    >Instance ID</label
+                  >
+                  <input
+                    id="instance-id"
+                    inputmode="numeric"
+                    data-i18n-placeholder="instanceId"
+                    placeholder="Instance ID"
+                  />
+                  <label
+                    for="instance-type"
+                    class="sr-only"
+                    data-i18n="instanceType"
+                    >Instance type</label
+                  >
+                  <select id="instance-type">
+                    <option
+                      value="NORMAL"
+                      data-i18n="normalJob"
+                    >
+                      Normal job
+                    </option>
+                    <option
+                      value="WORKFLOW"
+                      data-i18n="workflow"
+                    >
+                      Workflow
+                    </option>
+                  </select>
+                  <button
+                    type="submit"
+                    class="secondary"
+                    data-i18n="search"
+                  >
+                    Search
+                  </button>
                 </form>
               </div>
-              <div class="instances-table-scroll">
+              <div
+                id="instances-table-scroll"
+                class="instances-table-scroll"
+              >
                 <table class="instances-table">
-                  <thead><tr><th data-i18n="instanceId">Instance ID</th><th data-i18n="status">Status</th><th data-i18n="triggeredAt">Triggered at</th><th data-i18n="finishedAt">Finished at</th><th></th></tr></thead>
+                  <thead>
+                    <tr>
+                      <th data-i18n="instanceId">Instance ID</th>
+                      <th data-i18n="status">Status</th>
+                      <th data-i18n="triggeredAt">Triggered at</th>
+                      <th data-i18n="finishedAt">Finished at</th>
+                      <th></th>
+                    </tr>
+                  </thead>
                   <tbody id="instances-body"></tbody>
                 </table>
               </div>
               <div class="pager instances-pager">
                 <span id="instances-count"></span>
-                <button id="instances-prev" type="button" class="ghost" data-i18n="previous">Previous</button>
+                <button
+                  id="instances-prev"
+                  type="button"
+                  class="ghost"
+                  data-i18n="previous"
+                >
+                  Previous
+                </button>
                 <span id="instances-page"></span>
-                <button id="instances-next" type="button" class="ghost" data-i18n="next">Next</button>
+                <button
+                  id="instances-next"
+                  type="button"
+                  class="ghost"
+                  data-i18n="next"
+                >
+                  Next
+                </button>
               </div>
             </div>
 
             <div class="logs-pane">
               <div class="sub-pane-bar">
                 <strong data-i18n="instanceLogs">Instance logs</strong>
-                <span id="log-instance-label" class="muted"></span>
-                <span id="log-state" class="muted log-state"></span>
-                <button id="log-retry" type="button" class="ghost" data-i18n="retry" hidden>Retry</button>
+                <span
+                  id="log-instance-label"
+                  class="muted"
+                ></span>
+                <span
+                  id="log-state"
+                  class="muted log-state"
+                ></span>
+                <button
+                  id="log-retry"
+                  type="button"
+                  class="ghost"
+                  data-i18n="retry"
+                  hidden
+                >
+                  Retry
+                </button>
               </div>
-              <div id="log-scroll" class="log-scroll" role="log" data-i18n-aria-label="instanceLogs" aria-label="Instance logs">
-                <pre id="log-content">Select an instance above to view logs</pre>
-                <button id="log-more" type="button" class="ghost" data-i18n="loadMore" hidden>Load more</button>
+              <div
+                id="log-scroll"
+                class="log-scroll"
+                role="log"
+                data-i18n-aria-label="instanceLogs"
+                aria-label="Instance logs"
+              >
+                <pre id="log-content">
+Select an instance above to view logs</pre>
+                <button
+                  id="log-more"
+                  type="button"
+                  class="ghost"
+                  data-i18n="loadMore"
+                  hidden
+                >
+                  Load more
+                </button>
               </div>
             </div>
           </section>
@@ -103,7 +348,18 @@
     </div>
 
     <dialog id="instance-detail-dialog">
-      <div class="dialog-head"><h2 id="instance-detail-title">Instance details</h2><button id="instance-detail-close" type="button" class="ghost" data-i18n-aria-label="close" aria-label="Close">×</button></div>
+      <div class="dialog-head">
+        <h2 id="instance-detail-title">Instance details</h2>
+        <button
+          id="instance-detail-close"
+          type="button"
+          class="ghost"
+          data-i18n-aria-label="close"
+          aria-label="Close"
+        >
+          ×
+        </button>
+      </div>
       <pre id="instance-detail-content"></pre>
     </dialog>
   </body>
