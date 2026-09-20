@@ -15,8 +15,15 @@ export function LogViewer({
   instanceId: string;
   t: T;
 }) {
-  const { pages, loading, failed, nextIndex, totalPages, loadNext, refreshLatest } =
-    useLogs(connectionId, appId, instanceId);
+  const {
+    pages,
+    loading,
+    failed,
+    nextIndex,
+    totalPages,
+    loadNext,
+    refreshLatest,
+  } = useLogs(connectionId, appId, instanceId);
   const scroll = useRef<HTMLDivElement>(null);
   const autoFill = useRef(0);
   const [followLatest, setFollowLatest] = useState(false);
@@ -57,7 +64,8 @@ export function LogViewer({
     if (followLatest && more && !loading && !failed) void loadNext();
   }, [followLatest, more, loading, failed, loadNext]);
   useEffect(() => {
-    if (!followLatest || more || loading || failed || totalPages === null) return;
+    if (!followLatest || more || loading || failed || totalPages === null)
+      return;
     const timer = window.setInterval(() => void refreshLatest(), 3000);
     return () => window.clearInterval(timer);
   }, [followLatest, more, loading, failed, totalPages, refreshLatest]);
@@ -82,6 +90,8 @@ export function LogViewer({
         <span className="muted log-state">{state}</span>
         <div className="log-controls">
           <Button
+            size="xs"
+
             type="button"
             variant="ghost"
             disabled={!lines.length}
@@ -93,6 +103,7 @@ export function LogViewer({
             {t("logToTop")}
           </Button>
           <Button
+            size="xs"
             type="button"
             variant="ghost"
             disabled={!lines.length}
@@ -101,6 +112,7 @@ export function LogViewer({
             {t("logToBottom")}
           </Button>
           <Button
+            size="xs"
             type="button"
             variant="ghost"
             disabled={!instanceId}
@@ -115,9 +127,12 @@ export function LogViewer({
         </div>
         {failed && (
           <Button
+            size="xs"
             type="button"
             variant="ghost"
-            onClick={() => void (nextIndex === 0 || more ? loadNext() : refreshLatest())}
+            onClick={() =>
+              void (nextIndex === 0 || more ? loadNext() : refreshLatest())
+            }
           >
             {t("retry")}
           </Button>
@@ -133,7 +148,8 @@ export function LogViewer({
         }}
         onScroll={(event) => {
           const panel = event.currentTarget;
-          const atBottom = panel.scrollTop + panel.clientHeight >= panel.scrollHeight - 80;
+          const atBottom =
+            panel.scrollTop + panel.clientHeight >= panel.scrollHeight - 80;
           if (followLatest && !atBottom) setFollowLatest(false);
           if (atBottom) {
             autoFill.current = 0;
@@ -142,7 +158,10 @@ export function LogViewer({
         }}
       >
         {lines.length ? (
-          <div className="log-rows" style={{ height: totalSize }}>
+          <div
+            className="log-rows"
+            style={{ height: totalSize }}
+          >
             {virtualizer.getVirtualItems().map((row) => (
               <pre
                 key={row.key}

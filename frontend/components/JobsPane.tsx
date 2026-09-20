@@ -71,11 +71,19 @@ export function JobsPane({
 
   useEffect(() => setMenu(null), [jobs]);
 
-  function openMenu(job: Job, trigger: HTMLButtonElement, x: number, y: number) {
+  function openMenu(
+    job: Job,
+    trigger: HTMLButtonElement,
+    x: number,
+    y: number,
+  ) {
     if (busy || typeof job.enable !== "boolean") return;
     triggerRef.current = trigger;
-    setMenu({ job, x: Math.max(4, Math.min(x, window.innerWidth - 180)),
-      y: Math.max(4, Math.min(y, window.innerHeight - 76)) });
+    setMenu({
+      job,
+      x: Math.max(4, Math.min(x, window.innerWidth - 180)),
+      y: Math.max(4, Math.min(y, window.innerHeight - 76)),
+    });
   }
 
   return (
@@ -97,6 +105,7 @@ export function JobsPane({
             {t("jobKeyword")}
           </label>
           <Input
+            className="h-7 "
             id="job-keyword"
             type="search"
             placeholder={t("searchJobs")}
@@ -111,6 +120,7 @@ export function JobsPane({
             }}
           />
           <Button
+            size="xs"
             type="button"
             variant="secondary"
             onClick={onSearch}
@@ -134,23 +144,41 @@ export function JobsPane({
               key={job.id}
             >
               <Button
+                size="xs"
+
                 type="button"
+                variant="ghost"
                 className="job-item"
                 aria-pressed={String(job.id) === selectedJobId}
-                aria-haspopup={typeof job.enable === "boolean" ? "menu" : undefined}
+                aria-haspopup={
+                  typeof job.enable === "boolean" ? "menu" : undefined
+                }
                 aria-expanded={menu?.job.id === job.id}
                 title={`${label(job.jobName)} · ${label(job.id)} · ${t("jobContextHint")}`}
                 onClick={() => onChooseJob(job)}
                 onContextMenu={(event) => {
                   if (typeof job.enable !== "boolean") return;
                   event.preventDefault();
-                  openMenu(job, event.currentTarget, event.clientX, event.clientY);
+                  openMenu(
+                    job,
+                    event.currentTarget,
+                    event.clientX,
+                    event.clientY,
+                  );
                 }}
                 onKeyDown={(event) => {
-                  if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) {
+                  if (
+                    event.key === "ContextMenu" ||
+                    (event.shiftKey && event.key === "F10")
+                  ) {
                     event.preventDefault();
                     const rect = event.currentTarget.getBoundingClientRect();
-                    openMenu(job, event.currentTarget, rect.left + 12, rect.bottom);
+                    openMenu(
+                      job,
+                      event.currentTarget,
+                      rect.left + 12,
+                      rect.bottom,
+                    );
                   }
                 }}
               >
@@ -164,7 +192,9 @@ export function JobsPane({
                       .filter(Boolean)
                       .join(" · ") || t("noSchedule")}
                   </span>
-                  <span className={`job-enable-status job-enable-status--${job.enable ? "enabled" : "disabled"}`}>
+                  <span
+                    className={`job-enable-status job-enable-status--${job.enable ? "enabled" : "disabled"}`}
+                  >
                     {job.enable ? t("enabled") : t("disabled")}
                   </span>
                 </span>
@@ -174,23 +204,43 @@ export function JobsPane({
         )}
       </div>
       {menu && (
-        <div id="job-context-menu" ref={menuRef} className="job-context-menu"
-          role="menu" aria-label={t("jobActions")}
-          style={{ left: menu.x, top: menu.y }}>
-          <button ref={menuItemRef} type="button" role="menuitem" disabled={busy}
+        <div
+          id="job-context-menu"
+          ref={menuRef}
+          className="job-context-menu"
+          role="menu"
+          aria-label={t("jobActions")}
+          style={{ left: menu.x, top: menu.y }}
+        >
+          <Button
+            size="xs"
+
+            ref={menuItemRef}
+            type="button"
+            variant="ghost"
+            role="menuitem"
+            disabled={busy}
             onClick={() => {
               setMenu(null);
               onRunJob(menu.job);
-            }}>
+            }}
+          >
             {t("runJob")}
-          </button>
-          <button type="button" role="menuitem" disabled={busy}
+          </Button>
+          <Button
+            size="xs"
+
+            type="button"
+            variant="ghost"
+            role="menuitem"
+            disabled={busy}
             onClick={() => {
               setMenu(null);
               onSetJobEnabled(menu.job);
-            }}>
+            }}
+          >
             {t(menu.job.enable ? "disableJob" : "enableJob")}
-          </button>
+          </Button>
         </div>
       )}
       <Pager

@@ -21,6 +21,7 @@ export function Pager({
         {count && page ? t("total", { count: page.totalItems || 0 }) : ""}
       </span>
       <Button
+        size="xs"
         type="button"
         variant="ghost"
         disabled={!page || index <= 0}
@@ -30,6 +31,7 @@ export function Pager({
       </Button>
       <span>{totalPages ? `${index + 1} / ${totalPages}` : "0 / 0"}</span>
       <Button
+        size="xs"
         type="button"
         variant="ghost"
         disabled={!page || index + 1 >= totalPages}

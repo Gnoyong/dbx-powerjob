@@ -3,8 +3,18 @@ import type { PanelSize } from "react-resizable-panels";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { NativeSelect, NativeSelectOption } from "./ui/native-select";
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "./ui/resizable";
-import { dateLabel, instanceStatusOptions, isFailedNormalInstance, label, statusLabel } from "../format";
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "./ui/resizable";
+import {
+  dateLabel,
+  instanceStatusOptions,
+  isFailedNormalInstance,
+  label,
+  statusLabel,
+} from "../format";
 import type { Locale, TranslationKey } from "../i18n";
 import type { Instance, InstanceType, Page } from "../types";
 import type { T } from "../uiTypes";
@@ -88,7 +98,10 @@ export function RunsPane({
         onLayoutChanged={(_layout, meta) => {
           if (!meta.isUserInteraction || logsHeight.current <= 0) return;
           try {
-            localStorage.setItem(storageKey, String(Math.round(logsHeight.current)));
+            localStorage.setItem(
+              storageKey,
+              String(Math.round(logsHeight.current)),
+            );
           } catch {
             /* sandboxed host */
           }
@@ -113,11 +126,14 @@ export function RunsPane({
                   {t("instanceId")}
                 </label>
                 <Input
+                  className="h-7"
                   id="instance-id"
                   inputMode="numeric"
                   placeholder={t("instanceId")}
                   value={draftInstanceId}
-                  onChange={(event) => onDraftInstanceIdChange(event.target.value)}
+                  onChange={(event) =>
+                    onDraftInstanceIdChange(event.target.value)
+                  }
                   onKeyDown={(event) => {
                     if (event.key === "Enter") {
                       event.preventDefault();
@@ -145,7 +161,10 @@ export function RunsPane({
                     {t("workflow")}
                   </NativeSelectOption>
                 </NativeSelect>
-                <label htmlFor="instance-status" className="sr-only">
+                <label
+                  htmlFor="instance-status"
+                  className="sr-only"
+                >
                   {t("status")}
                 </label>
                 <NativeSelect
@@ -154,14 +173,20 @@ export function RunsPane({
                   value={draftStatus}
                   onChange={(event) => onDraftStatusChange(event.target.value)}
                 >
-                  <NativeSelectOption value="">{t("allStatuses")}</NativeSelectOption>
+                  <NativeSelectOption value="">
+                    {t("allStatuses")}
+                  </NativeSelectOption>
                   {instanceStatusOptions(draftType).map((value) => (
-                    <NativeSelectOption key={value} value={value}>
+                    <NativeSelectOption
+                      key={value}
+                      value={value}
+                    >
                       {statusLabel(value, draftType, locale)}
                     </NativeSelectOption>
                   ))}
                 </NativeSelect>
                 <Button
+                  size="xs"
                   type="button"
                   variant="secondary"
                   onClick={onSearch}
@@ -226,8 +251,12 @@ export function RunsPane({
                         <td>{dateLabel(instance.actualTriggerTime, locale)}</td>
                         <td>{dateLabel(instance.finishedTime, locale)}</td>
                         <td className="instance-actions">
-                          {isFailedNormalInstance(instance.status, filterType) && (
+                          {isFailedNormalInstance(
+                            instance.status,
+                            filterType,
+                          ) && (
                             <Button
+                              size="xs"
                               type="button"
                               variant="secondary"
                               disabled={busy}
@@ -240,6 +269,7 @@ export function RunsPane({
                             </Button>
                           )}
                           <Button
+                            size="xs"
                             type="button"
                             variant="ghost"
                             onClick={(event) => {
@@ -263,7 +293,10 @@ export function RunsPane({
             />
           </div>
         </ResizablePanel>
-        <ResizableHandle withHandle aria-label={t("resizeLogsPane")} />
+        <ResizableHandle
+          withHandle
+          aria-label={t("resizeLogsPane")}
+        />
         <ResizablePanel
           id="logs-panel"
           className="runs-panel"
