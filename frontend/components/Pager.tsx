@@ -1,3 +1,4 @@
+import { Button } from "./ui/button";
 import type { Page } from "../types";
 import type { T } from "../uiTypes";
 
@@ -19,23 +20,23 @@ export function Pager({
       <span>
         {count && page ? t("total", { count: page.totalItems || 0 }) : ""}
       </span>
-      <button
+      <Button
         type="button"
-        className="ghost"
+        variant="ghost"
         disabled={!page || index <= 0}
         onClick={() => onPage(index - 1)}
       >
         {t("previous")}
-      </button>
+      </Button>
       <span>{totalPages ? `${index + 1} / ${totalPages}` : "0 / 0"}</span>
-      <button
+      <Button
         type="button"
-        className="ghost"
+        variant="ghost"
         disabled={!page || index + 1 >= totalPages}
         onClick={() => onPage(index + 1)}
       >
         {t("next")}
-      </button>
+      </Button>
     </div>
   );
 }

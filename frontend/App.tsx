@@ -1,10 +1,18 @@
-import { useEffect, useState } from "react";
+import { Button } from "./components/ui/button";
+import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { label } from "./format";
 import { getHost, invoke } from "./host";
 import { normalizeLocale, translate } from "./i18n";
 import type { Locale, TranslationKey } from "./i18n";
-import type { AppInfo, Instance, InstanceType, Job, JobDetail, Page } from "./types";
+import type {
+  AppInfo,
+  Instance,
+  InstanceType,
+  Job,
+  JobDetail,
+  Page,
+} from "./types";
 import type { T } from "./uiTypes";
 import { Toolbar } from "./components/Toolbar";
 import { JobsPane } from "./components/JobsPane";
@@ -29,21 +37,28 @@ export default function App() {
   const [draftKeyword, setDraftKeyword] = useState("");
   const [keyword, setKeyword] = useState("");
   const [jobs, setJobs] = useState<Page<Job> | null>(null);
-  const [jobsStatus, setJobsStatus] = useState<TranslationKey>("selectConnection");
+  const [jobsStatus, setJobsStatus] =
+    useState<TranslationKey>("selectConnection");
   const [selectedJobId, setSelectedJobId] = useState("");
   const [detail, setDetail] = useState<JobDetail | null>(null);
-  const [detailStatus, setDetailStatus] = useState<TranslationKey>("selectJobDetail");
+  const [detailStatus, setDetailStatus] =
+    useState<TranslationKey>("selectJobDetail");
   const [tab, setTab] = useState<Tab>("detail");
   const [instanceIndex, setInstanceIndex] = useState(0);
   const [draftInstanceId, setDraftInstanceId] = useState("");
   const [draftType, setDraftType] = useState<InstanceType>("NORMAL");
-  const [filter, setFilter] = useState<Filter>({ type: "NORMAL", instanceId: "" });
+  const [filter, setFilter] = useState<Filter>({
+    type: "NORMAL",
+    instanceId: "",
+  });
   const [instances, setInstances] = useState<Page<Instance> | null>(null);
-  const [instancesStatus, setInstancesStatus] = useState<TranslationKey>("selectJobInstances");
+  const [instancesStatus, setInstancesStatus] =
+    useState<TranslationKey>("selectJobInstances");
   const [selectedInstanceId, setSelectedInstanceId] = useState("");
   const [modal, setModal] = useState<Instance | null>(null);
   const [refresh, setRefresh] = useState(0);
   const [appsRefresh, setAppsRefresh] = useState(0);
+  const appPageEdge = useRef<"first" | "last" | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -68,13 +83,16 @@ export default function App() {
           updateContext(host.context ?? null);
           unsubscribe = host.onContext(updateContext);
         })
-        .catch(() => { if (active) setHostFailed(true); });
+        .catch(() => {
+          if (active) setHostFailed(true);
+        });
     } catch {
       setHostFailed(true);
     }
     return () => {
       active = false;
-      if (updateLocale) window.removeEventListener("dbx-plugin-env", updateLocale);
+      if (updateLocale)
+        window.removeEventListener("dbx-plugin-env", updateLocale);
       if (typeof unsubscribe === "function") unsubscribe();
     };
   }, []);
@@ -84,6 +102,7 @@ export default function App() {
   }, [locale]);
 
   useEffect(() => {
+    appPageEdge.current = null;
     setAppsIndex(0);
     setApps(null);
     setAppId("");
@@ -104,23 +123,32 @@ export default function App() {
     }
     let active = true;
     setAppsStatus("loading");
-    void invoke(connectionId, "powerjob/apps", { index: appsIndex, pageSize: 100 })
+    void invoke(connectionId, "powerjob/apps", {
+      index: appsIndex,
+      pageSize: 100,
+    })
       .then((page) => {
         if (!active) return;
+        const edge = appPageEdge.current;
+        appPageEdge.current = null;
         setApps(page);
         setAppsStatus(page.data.length ? "loading" : "noApps");
         setAppId((previous) =>
-          page.data.some((item) => String(item.id) === previous)
-            ? previous : String(page.data[0]?.id ?? ""),
+          !edge && page.data.some((item) => String(item.id) === previous)
+            ? previous
+            : String(page.data[edge === "last" ? page.data.length - 1 : 0]?.id ?? ""),
         );
       })
       .catch(() => {
         if (!active) return;
+        appPageEdge.current = null;
         setApps(null);
         setAppId("");
         setAppsStatus("unavailable");
       });
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, [connectionId, appsIndex, appsRefresh]);
 
   useEffect(() => {
@@ -140,7 +168,10 @@ export default function App() {
     let active = true;
     setJobsStatus("loadingJobs");
     void invoke(connectionId, "powerjob/jobs", {
-      appId, index: jobsIndex, pageSize: 20, keyword,
+      appId,
+      index: jobsIndex,
+      pageSize: 20,
+      keyword,
     })
       .then((page) => {
         if (!active) return;
@@ -148,7 +179,8 @@ export default function App() {
         setJobsStatus(page.data.length ? "loading" : "noJobs");
         setSelectedJobId((previous) =>
           page.data.some((item) => String(item.id) === previous)
-            ? previous : String(page.data[0]?.id ?? ""),
+            ? previous
+            : String(page.data[0]?.id ?? ""),
         );
       })
       .catch(() => {
@@ -157,10 +189,13 @@ export default function App() {
         setSelectedJobId("");
         setJobsStatus("jobsFailed");
       });
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, [connectionId, appId, jobsIndex, keyword, refresh]);
 
-  const selectedJob = jobs?.data.find((item) => String(item.id) === selectedJobId) ?? null;
+  const selectedJob =
+    jobs?.data.find((item) => String(item.id) === selectedJobId) ?? null;
   useEffect(() => {
     if (!connectionId || !appId || !selectedJobId) {
       setDetail(null);
@@ -171,9 +206,15 @@ export default function App() {
     setDetail(null);
     setDetailStatus("loadingDetail");
     void invoke(connectionId, "powerjob/job", { appId, jobId: selectedJobId })
-      .then((value) => { if (active) setDetail(value); })
-      .catch(() => { if (active) setDetailStatus("detailFailed"); });
-    return () => { active = false; };
+      .then((value) => {
+        if (active) setDetail(value);
+      })
+      .catch(() => {
+        if (active) setDetailStatus("detailFailed");
+      });
+    return () => {
+      active = false;
+    };
   }, [connectionId, appId, selectedJobId, jobs]);
 
   useEffect(() => {
@@ -189,8 +230,12 @@ export default function App() {
     let active = true;
     setInstancesStatus("loadingInstances");
     void invoke(connectionId, "powerjob/instances", {
-      appId, jobId: selectedJobId, index: instanceIndex, pageSize: 20,
-      type: filter.type, instanceId: filter.instanceId,
+      appId,
+      jobId: selectedJobId,
+      index: instanceIndex,
+      pageSize: 20,
+      type: filter.type,
+      instanceId: filter.instanceId,
     })
       .then((page) => {
         if (!active) return;
@@ -198,7 +243,8 @@ export default function App() {
         setInstancesStatus(page.data.length ? "loading" : "noInstances");
         setSelectedInstanceId((previous) =>
           page.data.some((item) => String(item.instanceId) === previous)
-            ? previous : String(page.data[0]?.instanceId ?? ""),
+            ? previous
+            : String(page.data[0]?.instanceId ?? ""),
         );
       })
       .catch(() => {
@@ -207,17 +253,24 @@ export default function App() {
         setSelectedInstanceId("");
         setInstancesStatus("instancesFailed");
       });
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, [connectionId, appId, selectedJobId, tab, instanceIndex, filter, jobs]);
 
   const selectedApp = apps?.data.find((item) => String(item.id) === appId);
-  const appsLoading = appsStatus === "loading" && !apps;
+  const appsLoading = !apps || apps.index !== appsIndex;
   const jobsLoading = jobsStatus === "loadingJobs";
   const instancesLoading = instancesStatus === "loadingInstances";
-  const message = hostFailed ? "hostFailed"
-    : connectionId === "" ? "openFromConnection"
-    : appsStatus === "unavailable" ? "appsFailed"
-    : jobsStatus === "jobsFailed" ? "jobsFailed" : "";
+  const message = hostFailed
+    ? "hostFailed"
+    : connectionId === ""
+      ? "openFromConnection"
+      : appsStatus === "unavailable"
+        ? "appsFailed"
+        : jobsStatus === "jobsFailed"
+          ? "jobsFailed"
+          : "";
 
   function searchJobs(event: FormEvent) {
     event.preventDefault();
@@ -235,6 +288,22 @@ export default function App() {
     setAppId(next);
     setJobsIndex(0);
     setDetail(null);
+  }
+  function stepApp(direction: -1 | 1) {
+    if (!apps || appsLoading) return;
+    const currentIndex = apps.data.findIndex((item) => String(item.id) === appId);
+    if (currentIndex < 0) return;
+    const nextIndex = currentIndex + direction;
+    if (nextIndex >= 0 && nextIndex < apps.data.length) {
+      const nextApp = apps.data[nextIndex];
+      if (nextApp) chooseApp(String(nextApp.id));
+    } else if (direction < 0 && apps.index > 0) {
+      appPageEdge.current = "last";
+      setAppsIndex(apps.index - 1);
+    } else if (direction > 0 && apps.index + 1 < apps.totalPages) {
+      appPageEdge.current = "first";
+      setAppsIndex(apps.index + 1);
+    }
   }
   function chooseJob(job: Job) {
     if (String(job.id) === selectedJobId) return;
@@ -255,51 +324,127 @@ export default function App() {
 
   return (
     <div className="shell">
-      <Toolbar appId={appId} apps={apps} appsLoading={appsLoading} appsStatus={appsStatus}
-        onChooseApp={chooseApp} onPreviousApp={() => setAppsIndex((value) => value - 1)}
-        onNextApp={() => setAppsIndex((value) => value + 1)}
-        onRefresh={refreshCurrent} t={t} />
-      <span className="sr-only" aria-live="polite">
-        {selectedApp ? label(selectedApp.title || selectedApp.appName) : t(appsStatus)}
+      <Toolbar
+        appId={appId}
+        apps={apps}
+        appsLoading={appsLoading}
+        appsStatus={appsStatus}
+        onChooseApp={chooseApp}
+        onPreviousApp={() => stepApp(-1)}
+        onNextApp={() => stepApp(1)}
+        onRefresh={refreshCurrent}
+        t={t}
+      />
+      <span
+        className="sr-only"
+        aria-live="polite"
+      >
+        {selectedApp
+          ? label(selectedApp.title || selectedApp.appName)
+          : t(appsStatus)}
       </span>
-      {message && <div role="status" className="message">{t(message)}</div>}
+      {message && (
+        <div
+          role="status"
+          className="message"
+        >
+          {t(message)}
+        </div>
+      )}
       <main className="workspace">
-        <JobsPane jobs={jobs} loading={jobsLoading} status={jobsStatus}
-          draftKeyword={draftKeyword} selectedJobId={selectedJobId}
-          onDraftKeywordChange={setDraftKeyword} onSearch={searchJobs}
-          onChooseJob={chooseJob} onPage={setJobsIndex} t={t} />
+        <JobsPane
+          jobs={jobs}
+          loading={jobsLoading}
+          status={jobsStatus}
+          draftKeyword={draftKeyword}
+          selectedJobId={selectedJobId}
+          onDraftKeywordChange={setDraftKeyword}
+          onSearch={searchJobs}
+          onChooseJob={chooseJob}
+          onPage={setJobsIndex}
+          t={t}
+        />
         <Splitter t={t} />
-        <section id="detail-pane" className="detail-pane" aria-label={t("jobWorkspace")}>
+        <section
+          id="detail-pane"
+          className="detail-pane"
+          aria-label={t("jobWorkspace")}
+        >
           <div className="detail-bar">
-            <strong>{selectedJob ? `${label(selectedJob.jobName)}  ·  #${selectedJob.id}` : t("selectJob")}</strong>
-            <nav className="detail-tabs" aria-label={t("jobInfo")}>
-              <button type="button" className={tab === "detail" ? "active" : ""}
+            <strong>
+              {selectedJob
+                ? `${label(selectedJob.jobName)}  ·  #${selectedJob.id}`
+                : t("selectJob")}
+            </strong>
+            <nav
+              className="detail-tabs"
+              aria-label={t("jobInfo")}
+            >
+              <Button
+                type="button"
+                className={tab === "detail" ? "active" : ""}
                 aria-current={tab === "detail" ? "page" : undefined}
-                onClick={() => setTab("detail")}>{t("jobDetail")}</button>
-              <button type="button" className={tab === "runs" ? "active" : ""}
+                onClick={() => setTab("detail")}
+              >
+                {t("jobDetail")}
+              </Button>
+              <Button
+                type="button"
+                className={tab === "runs" ? "active" : ""}
                 aria-current={tab === "runs" ? "page" : undefined}
-                onClick={() => setTab("runs")}>{t("runsAndLogs")}</button>
+                onClick={() => setTab("runs")}
+              >
+                {t("runsAndLogs")}
+              </Button>
             </nav>
           </div>
-          <section className="job-detail-view" aria-label={t("jobDetail")} hidden={tab !== "detail"}>
-            <JobInspector detail={detail && String(detail.id) === selectedJobId ? detail : null}
-              status={detailStatus} t={t} />
+          <section
+            className="job-detail-view"
+            aria-label={t("jobDetail")}
+            hidden={tab !== "detail"}
+          >
+            <JobInspector
+              detail={
+                detail && String(detail.id) === selectedJobId ? detail : null
+              }
+              status={detailStatus}
+              t={t}
+            />
           </section>
-          <RunsPane visible={tab === "runs"} instances={instances}
-            loading={instancesLoading} status={instancesStatus}
-            draftInstanceId={draftInstanceId} draftType={draftType}
-            filterType={filter.type} selectedInstanceId={selectedInstanceId}
-            locale={locale} connectionId={connectionId || ""} appId={appId}
+          <RunsPane
+            visible={tab === "runs"}
+            instances={instances}
+            loading={instancesLoading}
+            status={instancesStatus}
+            draftInstanceId={draftInstanceId}
+            draftType={draftType}
+            filterType={filter.type}
+            selectedInstanceId={selectedInstanceId}
+            locale={locale}
+            connectionId={connectionId || ""}
+            appId={appId}
             selectedJobId={selectedJobId}
-            onDraftInstanceIdChange={setDraftInstanceId} onDraftTypeChange={setDraftType}
-            onSearch={searchInstances} onChooseInstance={chooseInstance}
-            onOpenInstance={setModal} onPage={setInstanceIndex} t={t} />
+            onDraftInstanceIdChange={setDraftInstanceId}
+            onDraftTypeChange={setDraftType}
+            onSearch={searchInstances}
+            onChooseInstance={chooseInstance}
+            onOpenInstance={setModal}
+            onPage={setInstanceIndex}
+            t={t}
+          />
         </section>
       </main>
       {modal && connectionId && (
-        <InstanceDialog key={`${appId}:${modal.instanceId}`} instance={modal}
-          type={filter.type} connectionId={connectionId} appId={appId}
-          locale={locale} onClose={() => setModal(null)} t={t} />
+        <InstanceDialog
+          key={`${appId}:${modal.instanceId}`}
+          instance={modal}
+          type={filter.type}
+          connectionId={connectionId}
+          appId={appId}
+          locale={locale}
+          onClose={() => setModal(null)}
+          t={t}
+        />
       )}
     </div>
   );

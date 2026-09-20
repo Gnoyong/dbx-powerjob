@@ -43,6 +43,8 @@ PowerJob Web API 不是稳定公开契约。升级 PowerJob 后应重新验证�
 
 使用 Node.js 22+、pnpm 11、Go 1.22+。`frontend/` 保存 React/TypeScript 源码，`ui/` 是 Vite 生成的静态文件，Manifest 仍以 `ui/index.html` 为入口。Vite 使用相对资源路径，运行时不依赖开发服务器或 CDN。
 
+前端使用 shadcn/ui 的项目内组件结构，配置见 `components.json`，基础控件在 `frontend/components/ui/`。控件沿用 `frontend/style.css` 的现有尺寸、颜色和布局；Tailwind 只加载主题与工具类，不加载会重置页面元素的 Preflight。
+
 ```powershell
 pnpm install --frozen-lockfile
 pnpm run build
@@ -51,10 +53,12 @@ pnpm run build
 官方 CLI 的开发模式会调用 `dbx-plugin.toml` 中的 `ui_build` / `ui_watch`；正式候选包也应先构建前端：
 
 ```powershell
-pnpm dlx @dbx-app/plugin-cli dev --path . --port 5190
+pnpm run dev
 pnpm run build
 pnpm dlx @dbx-app/plugin-cli package .
 ```
+
+`pnpm run dev` 使用项目内的 DBX 插件 CLI 启动浏览器开发宿主，并将 Go 构建缓存放在已忽略的 `backend/.go-cache/`。开发宿主默认使用 5190 端口，若被占用会选择空闲端口。
 
 `pnpm run typecheck` 可以单独检查 TypeScript。Release 工作流会先安装锁定依赖、构建前端，再调用 DBX 打包命令；该流程生成的候选包仍未签名。
 

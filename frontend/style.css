@@ -1,3 +1,7 @@
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+
 :root {
   font-family: Inter, "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
   color: var(--color-foreground, #202631);
@@ -208,7 +212,12 @@ input:focus, select:focus, button:focus-visible {
 .log-scroll pre { margin: 0; font: 11px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; overflow-wrap: anywhere; white-space: pre-wrap; }
 .log-scroll #log-more { display: block; margin: 8px auto; }
 
-dialog {
+.instance-dialog {
+  position: fixed;
+  z-index: 51;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   width: min(780px, calc(100vw - 24px));
   max-height: 86vh;
   padding: 12px;
@@ -218,10 +227,10 @@ dialog {
   color: var(--color-foreground, #202631);
   box-shadow: 0 16px 40px rgba(20, 35, 65, .18);
 }
-dialog::backdrop { background: rgba(13, 24, 43, .4); }
+.instance-dialog-overlay { position: fixed; z-index: 50; inset: 0; background: rgba(13, 24, 43, .4); }
 .dialog-head { justify-content: space-between; padding-bottom: 7px; border-bottom: 1px solid var(--color-border, #dce1e8); }
 h2 { margin: 0; font-size: 13px; font-weight: 600; }
-dialog pre { max-height: 70vh; margin: 10px 0 0; overflow: auto; overflow-wrap: anywhere; font: 11px/1.55 ui-monospace, SFMono-Regular, Consolas, monospace; white-space: pre-wrap; }
+.instance-dialog pre { max-height: 70vh; margin: 10px 0 0; overflow: auto; overflow-wrap: anywhere; font: 11px/1.55 ui-monospace, SFMono-Regular, Consolas, monospace; white-space: pre-wrap; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 [hidden] { display: none !important; }
 

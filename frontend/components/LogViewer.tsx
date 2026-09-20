@@ -1,3 +1,4 @@
+import { Button } from "./ui/button";
 import { useEffect, useRef } from "react";
 import { useLogs } from "../hooks/useLogs";
 import type { T } from "../uiTypes";
@@ -53,13 +54,13 @@ export function LogViewer({
         <span className="muted">{instanceId ? `#${instanceId}` : ""}</span>
         <span className="muted log-state">{state}</span>
         {failed && (
-          <button
+          <Button
             type="button"
-            className="ghost"
+            variant="ghost"
             onClick={() => void loadNext()}
           >
             {t("retry")}
-          </button>
+          </Button>
         )}
       </div>
       <div
@@ -87,16 +88,16 @@ export function LogViewer({
                   : content}
         </pre>
         {more && autoFill.current >= 4 && !loading && (
-          <button
+          <Button
             type="button"
-            className="ghost"
+            variant="ghost"
             onClick={() => {
               autoFill.current = 0;
               void loadNext();
             }}
           >
             {t("loadMore")}
-          </button>
+          </Button>
         )}
       </div>
     </div>

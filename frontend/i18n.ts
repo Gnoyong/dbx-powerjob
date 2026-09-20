@@ -1,6 +1,6 @@
 export const dictionaries = {
     en: {
-      title: "PowerJob Read Only", app: "Application", previousApp: "Previous applications", nextApp: "Next applications",
+      title: "PowerJob Read Only", app: "Application", previousApp: "Previous application", nextApp: "Next application",
       readonly: "Read only", refresh: "Refresh", jobList: "Job list", resizeJobsPane: "Resize job list", jobs: "Jobs", jobKeyword: "Job keyword",
       searchJobs: "Search jobs", search: "Search", previous: "Previous", next: "Next", jobWorkspace: "Job workspace",
       selectJob: "Select a job on the left", jobInfo: "Job information", jobDetail: "Job details", runsAndLogs: "Instances & logs",
@@ -34,7 +34,7 @@ export const dictionaries = {
       gmtCreate: "Created at", gmtModified: "Modified at",
     },
     "zh-CN": {
-      title: "PowerJob 只读查看", app: "应用", previousApp: "上一页应用", nextApp: "下一页应用",
+      title: "PowerJob 只读查看", app: "应用", previousApp: "上一个应用", nextApp: "下一个应用",
       readonly: "只读", refresh: "刷新", jobList: "任务列表", resizeJobsPane: "调整任务栏宽度", jobs: "任务", jobKeyword: "任务关键字",
       searchJobs: "搜索任务", search: "查询", previous: "上一页", next: "下一页", jobWorkspace: "任务工作区",
       selectJob: "选择左侧任务", jobInfo: "任务信息", jobDetail: "任务详情", runsAndLogs: "实例与日志",

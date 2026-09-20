@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 
 process.chdir(path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."));
-const watcher = await build({ build: { watch: {} } });
+const watcher = await build({ configLoader: "runner", build: { watch: {} } });
 let failed = false;
 watcher.on("event", event => {
   if (event.code === "START") failed = false;

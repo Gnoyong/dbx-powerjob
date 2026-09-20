@@ -1,3 +1,6 @@
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import { NativeSelect, NativeSelectOption } from "./ui/native-select";
 import type { FormEvent } from "react";
 import { dateLabel, label, statusLabel } from "../format";
 import type { Locale, TranslationKey } from "../i18n";
@@ -39,16 +42,16 @@ export function RunsPane({
           <strong>{t("jobInstances")}</strong>
           <form className="instance-filter" onSubmit={onSearch}>
             <label htmlFor="instance-id" className="sr-only">{t("instanceId")}</label>
-            <input id="instance-id" inputMode="numeric" placeholder={t("instanceId")}
+            <Input id="instance-id" inputMode="numeric" placeholder={t("instanceId")}
               value={draftInstanceId}
               onChange={(event) => onDraftInstanceIdChange(event.target.value)} />
             <label htmlFor="instance-type" className="sr-only">{t("instanceType")}</label>
-            <select id="instance-type" value={draftType}
+            <NativeSelect id="instance-type" value={draftType}
               onChange={(event) => onDraftTypeChange(event.target.value as InstanceType)}>
-              <option value="NORMAL">{t("normalJob")}</option>
-              <option value="WORKFLOW">{t("workflow")}</option>
-            </select>
-            <button type="submit" className="secondary">{t("search")}</button>
+              <NativeSelectOption value="NORMAL">{t("normalJob")}</NativeSelectOption>
+              <NativeSelectOption value="WORKFLOW">{t("workflow")}</NativeSelectOption>
+            </NativeSelect>
+            <Button type="submit" variant="secondary">{t("search")}</Button>
           </form>
         </div>
         <div className="instances-table-scroll">
@@ -79,10 +82,10 @@ export function RunsPane({
                   <td>{statusLabel(instance.status, filterType, locale)}</td>
                   <td>{dateLabel(instance.actualTriggerTime, locale)}</td>
                   <td>{dateLabel(instance.finishedTime, locale)}</td>
-                  <td><button type="button" className="ghost" onClick={(event) => {
+                  <td><Button type="button" variant="ghost" onClick={(event) => {
                     event.stopPropagation();
                     onOpenInstance(instance);
-                  }}>{t("detail")}</button></td>
+                  }}>{t("detail")}</Button></td>
                 </tr>
               ))}
             </tbody>
