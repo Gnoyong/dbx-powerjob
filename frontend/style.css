@@ -235,17 +235,14 @@ button:focus-visible {
 }
 
 .job-item-wrap {
-  display: flex;
-  align-items: center;
   border-bottom: 1px solid var(--color-border, #edf0f3);
 }
 
 .job-item {
   display: flex;
   flex-direction: column;
-  flex: 1 1 auto;
   gap: 3px;
-  min-width: 0;
+  width: 100%;
   min-height: 52px;
   padding: 7px 10px;
   border: 0;
@@ -328,51 +325,16 @@ button:focus-visible {
   white-space: nowrap;
 }
 
-.switch {
-  display: inline-flex;
-  align-items: center;
-  width: 36px;
-  height: 20px;
-  padding: 2px;
-  border-radius: 999px;
-  cursor: pointer;
-  transition: background-color .15s ease;
+.job-enable-status {
+  font-weight: 600;
 }
 
-.switch[data-checked] {
-  background: var(--color-success, #17643a);
+.job-enable-status--enabled {
+  color: var(--color-success, #17643a);
 }
 
-.switch[data-unchecked] {
-  background: var(--color-destructive, #a3312a);
-}
-
-.switch[data-disabled] {
-  opacity: .45;
-  cursor: default;
-}
-
-.switch:focus-visible {
-  outline: 2px solid var(--color-primary, #3565c8);
-  outline-offset: 2px;
-}
-
-.switch-thumb {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, .25);
-  transition: transform .15s ease;
-}
-
-.switch-thumb[data-checked] {
-  transform: translateX(16px);
-}
-
-.job-switch {
-  flex: 0 0 auto;
-  margin: 0 10px 0 4px;
+.job-enable-status--disabled {
+  color: var(--color-destructive, #a3312a);
 }
 
 .empty-pane {
@@ -680,12 +642,12 @@ button:focus-visible {
   --status-color: var(--color-destructive, var(--powerjob-destructive-fallback));
 }
 
-:root[data-dbx-theme="dark"] .switch[data-checked] {
-  background: var(--color-success, var(--powerjob-success-fallback));
+:root[data-dbx-theme="dark"] .job-enable-status--enabled {
+  color: var(--color-success, var(--powerjob-success-fallback));
 }
 
-:root[data-dbx-theme="dark"] .switch[data-unchecked] {
-  background: var(--color-destructive, var(--powerjob-destructive-fallback));
+:root[data-dbx-theme="dark"] .job-enable-status--disabled {
+  color: var(--color-destructive, var(--powerjob-destructive-fallback));
 }
 
 :root[data-dbx-theme="dark"] .message.success {

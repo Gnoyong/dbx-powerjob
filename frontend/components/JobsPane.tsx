@@ -164,7 +164,9 @@ export function JobsPane({
                       .filter(Boolean)
                       .join(" · ") || t("noSchedule")}
                   </span>
-                  <span>{job.enable ? t("enabled") : t("disabled")}</span>
+                  <span className={`job-enable-status job-enable-status--${job.enable ? "enabled" : "disabled"}`}>
+                    {job.enable ? t("enabled") : t("disabled")}
+                  </span>
                 </span>
               </Button>
             </div>
