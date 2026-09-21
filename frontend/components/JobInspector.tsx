@@ -21,8 +21,6 @@ const textFields = new Set([
   "processorInfo",
   "designatedWorkers",
   "dispatchStrategyConfig",
-  "tag",
-  "extra",
 ]);
 const integerFields = new Set([
   "maxInstanceNum",
@@ -50,6 +48,18 @@ const options: Record<string, string[]> = {
   processorType: ["BUILT_IN", "EXTERNAL", "SHELL", "PYTHON"],
   dispatchStrategy: ["HEALTH_FIRST", "RANDOM", "SPECIFY"],
 };
+const scheduleFields = [
+  ["timeExpressionType", "timeExpressionType"],
+  ["timeExpression", "timeExpression"],
+] as const;
+const idFields = [["id", "jobId"], ["appId", "appId"]] as const;
+const resourceFields = [
+  ["minCpuCores", "minCpuCores"],
+  ["minMemorySpace", "minMemorySpace"],
+  ["minDiskSpace", "minDiskSpace"],
+] as const;
+const runtimeNumberFields = ["maxInstanceNum", "concurrency", "instanceTimeLimit"] as const;
+const runtimeFields = [...runtimeNumberFields, "dispatchStrategy", "dispatchStrategyConfig"] as const;
 type ConfigField = {
   name: string;
   title: TranslationKey;
@@ -86,16 +96,6 @@ const configFields: Record<string, ConfigField[]> = {
       ],
     },
     { name: "loggerName", title: "loggerName" },
-  ],
-  advancedRuntimeConfig: [
-    {
-      name: "taskTrackerBehavior",
-      title: "taskTrackerBehavior",
-      choices: [
-        ["1", "trackerNormal"],
-        ["11", "trackerPaddling"],
-      ],
-    },
   ],
 };
 
@@ -283,6 +283,19 @@ function JobForm({
   ]
     .filter(Boolean)
     .join(" – ");
+  const showScheduleRow = scheduleFields.every(([field]) => field in detail);
+  const showResourceRow = resourceFields.every(([field]) => field in detail);
+  const showProcessorRow = "processorType" in detail && "processorInfo" in detail;
+  const showExecuteTypeInExecution = showProcessorRow && "executeType" in detail;
+  const showWorkerRow = "designatedWorkers" in detail && "maxWorkerCount" in detail;
+  const showDispatchRow = "dispatchStrategy" in detail && "dispatchStrategyConfig" in detail;
+  const showRetryRow = "instanceRetryNum" in detail && "taskRetryNum" in detail;
+  const showRuntimeRow = runtimeFields.every((field) => field in detail);
+  const showTimestampsRow = "gmtCreate" in detail && "gmtModified" in detail;
+  const showIdsRow = idFields.every(([field]) => field in detail);
+  const executeChoices = options.executeType ?? [];
+  const processorChoices = options.processorType ?? [];
+  const dispatchChoices = options.dispatchStrategy ?? [];
 
   return (
     <form
@@ -328,10 +341,243 @@ function JobForm({
         </p>
       )}
       <table className="inspector-table">
+        <colgroup>
+          <col className="inspector-label-column" />
+          <col />
+        </colgroup>
         <tbody>
           {jobFields
             .filter(([field]) => field in detail || field === "lifeCycle")
             .map(([field, title]) => {
+              if (showIdsRow && field === "appId") return null;
+              if (showIdsRow && field === "id") {
+                return (
+                  <tr key="ids">
+                    <td colSpan={2}>
+                      <dl className="job-inline-fields job-readonly-fields">
+                        {idFields.map(([idField, idTitle]) => (
+                          <div key={idField}>
+                            <dt>{t(idTitle)}</dt>
+                            <dd>{label(detail[idField])}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                    </td>
+                  </tr>
+                );
+              }
+              if (showScheduleRow && field === "timeExpression") return null;
+              if (showScheduleRow && field === "timeExpressionType") {
+                return (
+                  <tr key="schedule" className="job-schedule-row">
+                    <th scope="row">{t("scheduleConfig")}</th>
+                    <td>
+                      <div className="job-inline-fields">
+                        {scheduleFields.map(([scheduleField, scheduleTitle]) => {
+                          const choices = options[scheduleField];
+                          return (
+                            <label key={scheduleField}>
+                              <span>{t(scheduleTitle)}</span>
+                              {choices ? (
+                                <select value={values[scheduleField] ?? ""} disabled={busy}
+                                  onChange={(event) => setField(scheduleField, event.target.value)}>
+                                  {!choices.includes(values[scheduleField] ?? "") && (
+                                    <option value={values[scheduleField]}>{values[scheduleField]}</option>
+                                  )}
+                                  {choices.map((option) => <option key={option} value={option}>{option}</option>)}
+                                </select>
+                              ) : (
+                                <input type="text" value={values[scheduleField] ?? ""} maxLength={65536} disabled={busy}
+                                  onChange={(event) => setField(scheduleField, event.target.value)} />
+                              )}
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              }
+              if (showExecuteTypeInExecution && field === "executeType") return null;
+              if (showProcessorRow && field === "processorInfo") return null;
+              if (showProcessorRow && field === "processorType") {
+                return (
+                  <tr key="processor">
+                    <th scope="row">{t("executionConfig")}</th>
+                    <td>
+                      <div className="job-inline-fields job-execution-fields">
+                        {showExecuteTypeInExecution && (
+                          <label>
+                            <span>{t("executeType")}</span>
+                            <select value={values.executeType ?? ""} disabled={busy}
+                              onChange={(event) => setField("executeType", event.target.value)}>
+                              {!executeChoices.includes(values.executeType ?? "") && (
+                                <option value={values.executeType}>{values.executeType}</option>
+                              )}
+                              {executeChoices.map((option) => <option key={option} value={option}>{option}</option>)}
+                            </select>
+                          </label>
+                        )}
+                        <label>
+                          <span>{t("processorType")}</span>
+                          <select value={values.processorType ?? ""} disabled={busy}
+                            onChange={(event) => setField("processorType", event.target.value)}>
+                            {!processorChoices.includes(values.processorType ?? "") && (
+                              <option value={values.processorType}>{values.processorType}</option>
+                            )}
+                            {processorChoices.map((option) => <option key={option} value={option}>{option}</option>)}
+                          </select>
+                        </label>
+                        <label>
+                          <span>{t("processorInfo")}</span>
+                          <input type="text" value={values.processorInfo ?? ""} maxLength={65536} disabled={busy}
+                            onChange={(event) => setField("processorInfo", event.target.value)} />
+                        </label>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              }
+              if (showResourceRow && (field === "minMemorySpace" || field === "minDiskSpace")) return null;
+              if (showResourceRow && field === "minCpuCores") {
+                return (
+                  <tr key="resources">
+                    <th scope="row">{t("machineConfig")}</th>
+                    <td>
+                      <div className="job-inline-fields job-machine-fields">
+                        {resourceFields.map(([resourceField, resourceTitle]) => (
+                          <label key={resourceField}>
+                            <span>{t(resourceTitle)}</span>
+                            <input type="number" min={0} step="any" value={values[resourceField] ?? ""}
+                              disabled={busy} onChange={(event) => setField(resourceField, event.target.value)} />
+                          </label>
+                        ))}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              }
+              if (showWorkerRow && field === "maxWorkerCount") return null;
+              if (showWorkerRow && field === "designatedWorkers") {
+                return (
+                  <tr key="workers">
+                    <th scope="row">{t("clusterConfig")}</th>
+                    <td>
+                      <div className="job-inline-fields">
+                        <label>
+                          <span>{t("designatedWorkers")}</span>
+                          <input type="text" value={values.designatedWorkers ?? ""} maxLength={65536} disabled={busy}
+                            onChange={(event) => setField("designatedWorkers", event.target.value)} />
+                        </label>
+                        <label>
+                          <span>{t("maxWorkerCount")}</span>
+                          <input type="number" min={0} step="1" value={values.maxWorkerCount ?? ""} disabled={busy}
+                            onChange={(event) => setField("maxWorkerCount", event.target.value)} />
+                        </label>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              }
+              if (showRuntimeRow && field !== "maxInstanceNum" && runtimeFields.some((runtimeField) => runtimeField === field)) return null;
+              if (showRuntimeRow && field === "maxInstanceNum") {
+                return (
+                  <tr key="runtime">
+                    <th scope="row">{t("runtimeConfig")}</th>
+                    <td>
+                      <div className="job-inline-fields job-runtime-fields">
+                        {runtimeNumberFields.map((runtimeField) => (
+                          <label key={runtimeField}>
+                            <span>{t(runtimeField)}</span>
+                            <input type="number" min={0} step="1" value={values[runtimeField] ?? ""} disabled={busy}
+                              onChange={(event) => setField(runtimeField, event.target.value)} />
+                          </label>
+                        ))}
+                        <label>
+                          <span>{t("dispatchStrategy")}</span>
+                          <select value={values.dispatchStrategy ?? ""} disabled={busy}
+                            onChange={(event) => setField("dispatchStrategy", event.target.value)}>
+                            {!dispatchChoices.includes(values.dispatchStrategy ?? "") && (
+                              <option value={values.dispatchStrategy}>{values.dispatchStrategy}</option>
+                            )}
+                            {dispatchChoices.map((option) => <option key={option} value={option}>{option}</option>)}
+                          </select>
+                        </label>
+                        <label>
+                          <span>{t("dispatchStrategyConfig")}</span>
+                          <input type="text" value={values.dispatchStrategyConfig ?? ""} maxLength={65536} disabled={busy}
+                            onChange={(event) => setField("dispatchStrategyConfig", event.target.value)} />
+                        </label>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              }
+              if (showDispatchRow && field === "dispatchStrategyConfig") return null;
+              if (showDispatchRow && field === "dispatchStrategy") {
+                return (
+                  <tr key="dispatch">
+                    <td colSpan={2}>
+                      <div className="job-inline-fields job-paired-fields">
+                        <label>
+                          <span>{t("dispatchStrategy")}</span>
+                          <select value={values.dispatchStrategy ?? ""} disabled={busy}
+                            onChange={(event) => setField("dispatchStrategy", event.target.value)}>
+                            {!dispatchChoices.includes(values.dispatchStrategy ?? "") && (
+                              <option value={values.dispatchStrategy}>{values.dispatchStrategy}</option>
+                            )}
+                            {dispatchChoices.map((option) => <option key={option} value={option}>{option}</option>)}
+                          </select>
+                        </label>
+                        <label>
+                          <span>{t("dispatchStrategyConfig")}</span>
+                          <input type="text" value={values.dispatchStrategyConfig ?? ""} maxLength={65536} disabled={busy}
+                            onChange={(event) => setField("dispatchStrategyConfig", event.target.value)} />
+                        </label>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              }
+              if (showRetryRow && field === "taskRetryNum") return null;
+              if (showRetryRow && field === "instanceRetryNum") {
+                return (
+                  <tr key="retry">
+                    <th scope="row">{t("retryConfig")}</th>
+                    <td>
+                      <div className="job-inline-fields job-retry-fields">
+                        <label>
+                          <span>{t("instanceRetryNum")}</span>
+                          <input type="number" min={0} step="1" value={values.instanceRetryNum ?? ""} disabled={busy}
+                            onChange={(event) => setField("instanceRetryNum", event.target.value)} />
+                        </label>
+                        <label>
+                          <span>{t("taskRetryNum")}</span>
+                          <input type="number" min={0} step="1" value={values.taskRetryNum ?? ""} disabled={busy}
+                            onChange={(event) => setField("taskRetryNum", event.target.value)} />
+                        </label>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              }
+              if (showTimestampsRow && field === "gmtModified") return null;
+              if (showTimestampsRow && field === "gmtCreate") {
+                return (
+                  <tr key="timestamps">
+                    <td colSpan={2}>
+                      <dl className="job-inline-fields job-readonly-fields">
+                        {(["gmtCreate", "gmtModified"] as const).map((timestampField) => (
+                          <div key={timestampField}>
+                            <dt>{t(timestampField)}</dt>
+                            <dd>{jobDateLabel(detail[timestampField], locale)}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                    </td>
+                  </tr>
+                );
+              }
               const value = detail[field];
               const choices = options[field];
               const editable =
@@ -539,9 +785,7 @@ function JobForm({
                           </option>
                         ))}
                       </select>
-                    ) : field === "jobParams" ||
-                      field === "processorInfo" ||
-                      field === "jobDescription" ? (
+                    ) : field === "jobParams" || field === "jobDescription" ? (
                       <textarea
                         aria-label={t(title)}
                         value={values[field] ?? ""}

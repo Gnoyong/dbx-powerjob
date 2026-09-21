@@ -15,13 +15,17 @@
       "label": "打包 DBX 插件",
       "type": "process",
       "command": "node",
-      "args": ["node_modules/@dbx-app/plugin-cli/bin/dbx-plugin.js", "package", "."],
+      "args": [
+        "node_modules/@dbx-app/plugin-cli/bin/dbx-plugin.js",
+        "package",
+        "."
+      ],
       "options": {
-        "cwd": "${workspaceFolder}",
-        "env": {
-          "GOCACHE": "${workspaceFolder}/backend/.go-cache",
-          "PATH": "C:\\Program Files\\Go\\bin;${env:PATH}"
-        }
+        "cwd": "${workspaceFolder}"
+        // "env": {
+        //   "GOCACHE": "${workspaceFolder}/backend/.go-cache",
+        //   "PATH": "C:\\Program Files\\Go\\bin;${env:PATH}"
+        // }
       },
       "dependsOn": "构建插件前端",
       "group": {

@@ -90,8 +90,7 @@ export const jobFields: [string, TranslationKey][] = [
   ["dispatchStrategyConfig", "dispatchStrategyConfig"],
   ["minCpuCores", "minCpuCores"], ["minMemorySpace", "minMemorySpace"], ["minDiskSpace", "minDiskSpace"],
   ["designatedWorkers", "designatedWorkers"], ["maxWorkerCount", "maxWorkerCount"],
-  ["tag", "tag"], ["extra", "extra"],
   ["lifeCycle", "lifeCycle"], ["alarmConfig", "alarmConfig"],
-  ["logConfig", "logConfig"], ["advancedRuntimeConfig", "advancedRuntimeConfig"],
+  ["logConfig", "logConfig"],
   ["gmtCreate", "gmtCreate"], ["gmtModified", "gmtModified"],
 ];

@@ -444,6 +444,10 @@ input[data-slot="input"][aria-invalid="true"] {
   font-size: 12px;
 }
 
+.inspector-label-column {
+  width: 150px;
+}
+
 .inspector-table th,
 .inspector-table td {
   padding: 8px 10px;
@@ -453,7 +457,6 @@ input[data-slot="input"][aria-invalid="true"] {
 }
 
 .inspector-table th {
-  width: 150px;
   color: var(--color-muted-foreground, #677282);
   font-weight: 500;
 }
@@ -466,6 +469,66 @@ input[data-slot="input"][aria-invalid="true"] {
   margin: 0;
   font: 11px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace;
   white-space: pre-wrap;
+}
+
+.job-inline-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr));
+  gap: 8px 12px;
+}
+
+.job-paired-fields {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+}
+
+.job-retry-fields {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr));
+}
+
+.job-runtime-fields {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 120px), 1fr));
+}
+
+.job-machine-fields {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr));
+}
+
+.job-schedule-row .job-inline-fields {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr));
+}
+
+.job-execution-fields {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr));
+}
+
+.job-inline-fields label {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.job-inline-fields label span {
+  color: var(--color-muted-foreground, #677282);
+  font-weight: 500;
+}
+
+.job-readonly-fields {
+  margin: 0;
+}
+
+.job-readonly-fields > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.job-readonly-fields dt {
+  color: var(--color-muted-foreground, #677282);
+  font-weight: 500;
+}
+
+.job-readonly-fields dd {
+  margin: 0;
 }
 
 .runs-view {
@@ -771,6 +834,135 @@ input[data-slot="input"][aria-invalid="true"] {
   box-shadow: 0 16px 40px rgba(20, 35, 65, .18);
 }
 
+.instance-detail-dialog {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+  font-size: 12px;
+}
+
+.instance-detail-dialog .dialog-head {
+  flex: 0 0 auto;
+  min-height: 45px;
+  padding: 8px 12px;
+}
+
+.instance-detail-dialog .dialog-head button {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+}
+
+.instance-detail-dialog .dialog-head button svg {
+  width: 16px;
+  height: 16px;
+}
+
+.instance-detail-state {
+  min-height: 120px;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  color: var(--color-muted-foreground, #677282);
+}
+
+.instance-detail-body {
+  min-height: 0;
+  overflow: auto;
+}
+
+.instance-detail-section {
+  padding: 12px 14px 14px;
+}
+
+.instance-detail-section + .instance-detail-section {
+  border-top: 1px solid var(--color-border, #edf0f3);
+}
+
+.instance-detail-section-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.instance-detail-section-title svg {
+  width: 15px;
+  height: 15px;
+  color: var(--color-muted-foreground, #677282);
+}
+
+.instance-timing-grid,
+.instance-runtime-grid {
+  display: grid;
+  margin: 0;
+  gap: 12px 20px;
+}
+
+.instance-timing-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.instance-runtime-grid {
+  grid-template-columns: minmax(120px, .5fr) minmax(240px, 1.5fr);
+}
+
+.instance-timing-grid > div,
+.instance-runtime-grid > div {
+  min-width: 0;
+}
+
+.instance-timing-grid dt,
+.instance-runtime-grid dt {
+  margin-bottom: 4px;
+  color: var(--color-muted-foreground, #677282);
+}
+
+.instance-timing-grid dd,
+.instance-runtime-grid dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-weight: 500;
+}
+
+.instance-detail-mono,
+.instance-text-fields pre {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.instance-text-fields {
+  display: grid;
+  gap: 10px;
+}
+
+.instance-text-fields > div {
+  min-width: 0;
+}
+
+.instance-text-fields h4 {
+  margin: 0 0 5px;
+  color: var(--color-muted-foreground, #677282);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.instance-detail-dialog .instance-text-fields pre {
+  max-height: 220px;
+  margin: 0;
+  padding: 8px 10px;
+  overflow: auto;
+  border: 1px solid var(--color-border, #dce1e8);
+  border-radius: 4px;
+  background: var(--color-muted, #f5f6f8);
+  font-size: 11px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
 .instance-dialog-overlay {
   position: fixed;
   z-index: 50;
@@ -973,7 +1165,7 @@ h2 {
   font-weight: 600;
 }
 
-.instance-dialog pre {
+.instance-dialog > pre {
   max-height: 70vh;
   margin: 10px 0 0;
   overflow: auto;
@@ -1023,5 +1215,10 @@ h2 {
 
   .instances-table {
     min-width: 490px;
+  }
+
+  .instance-timing-grid,
+  .instance-runtime-grid {
+    grid-template-columns: 1fr;
   }
 }
