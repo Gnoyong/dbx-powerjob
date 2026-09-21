@@ -154,18 +154,22 @@ function initialValues(detail: JobDetail): Record<string, string> {
 
 function JobForm({
   detail,
+  mode,
   busy,
   error,
   onSave,
   onEdit,
+  onCancel,
   locale,
   t,
 }: {
   detail: JobDetail;
+  mode: "edit" | "create";
   busy: boolean;
   error: TranslationKey | null;
   onSave: (changes: Record<string, unknown>) => void;
   onEdit: () => void;
+  onCancel?: () => void;
   locale: Locale;
   t: T;
 }) {
@@ -190,8 +194,20 @@ function JobForm({
 
   function submit(event: FormEvent) {
     event.preventDefault();
+    if (
+      !values.jobName?.trim() ||
+      !values.processorInfo?.trim() ||
+      !options.timeExpressionType?.includes(values.timeExpressionType ?? "") ||
+      !options.executeType?.includes(values.executeType ?? "") ||
+      !options.processorType?.includes(values.processorType ?? "")
+    ) {
+      setValidationError("invalidJobRequired");
+      return;
+    }
     const changes: Record<string, unknown> = {};
-    for (const field of dirtyFields) {
+    const submittedFields =
+      mode === "create" ? Object.keys(values) : dirtyFields;
+    for (const field of submittedFields) {
       const raw = values[field] ?? "";
       if (field.startsWith("lifeCycle.") || field.includes(".")) continue;
       if (field === "enable") changes.enable = raw === "true";
@@ -206,7 +222,7 @@ function JobForm({
       } else changes[field] = raw;
     }
     for (const [field, specs] of Object.entries(configFields)) {
-      if (!dirtyFields.some((key) => key.startsWith(field + "."))) continue;
+      if (!submittedFields.some((key) => key.startsWith(field + "."))) continue;
       const config = { ...configObject(detail, field) };
       for (const spec of specs) {
         const raw = values[field + "." + spec.name] ?? "";
@@ -232,7 +248,7 @@ function JobForm({
       }
       changes[field] = config;
     }
-    if (dirtyFields.some((field) => field.startsWith("lifeCycle."))) {
+    if (submittedFields.some((field) => field.startsWith("lifeCycle."))) {
       const cycle = configObject(detail, "lifeCycle");
       const original = (part: "start" | "end") =>
         cycle[part] == null ? null : Number(cycle[part]);
@@ -303,6 +319,22 @@ function JobForm({
       onSubmit={submit}
     >
       <div className="job-edit-actions">
+        {mode === "create" && onCancel && (
+          <Button
+            size="xs"
+            variant="ghost"
+            type="button"
+            disabled={busy}
+            title={t("cancel")}
+            onClick={onCancel}
+          >
+            <X
+              size={14}
+              aria-hidden="true"
+            />{" "}
+            {t("cancel")}
+          </Button>
+        )}
         <Button
           size="xs"
           variant="secondary"
@@ -317,7 +349,7 @@ function JobForm({
           />{" "}
           {t("resetJob")}
         </Button>
-        {dirtyFields.length > 0 && (
+        {(mode === "create" || dirtyFields.length > 0) && (
           <Button
             size="xs"
             type="submit"
@@ -328,7 +360,15 @@ function JobForm({
               size={14}
               aria-hidden="true"
             />{" "}
-            {t(busy ? "savingJob" : "saveJob")}
+            {t(
+              busy
+                ? mode === "create"
+                  ? "creatingJob"
+                  : "savingJob"
+                : mode === "create"
+                  ? "createJob"
+                  : "saveJob",
+            )}
           </Button>
         )}
       </div>
@@ -848,19 +888,23 @@ function JobForm({
 export function JobInspector({
   detail,
   status,
+  mode = "edit",
   busy,
   error,
   onSave,
   onEdit,
+  onCancel,
   locale,
   t,
 }: {
   detail: JobDetail | null;
   status: TranslationKey;
+  mode?: "edit" | "create";
   busy: boolean;
   error: TranslationKey | null;
   onSave: (changes: Record<string, unknown>) => void;
   onEdit: () => void;
+  onCancel?: () => void;
   locale: Locale;
   t: T;
 }) {
@@ -869,10 +913,12 @@ export function JobInspector({
   return (
     <JobForm
       detail={detail}
+      mode={mode}
       busy={busy}
       error={error}
       onSave={onSave}
       onEdit={onEdit}
+      onCancel={onCancel}
       locale={locale}
       t={t}
     />

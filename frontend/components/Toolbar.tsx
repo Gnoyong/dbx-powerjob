@@ -4,6 +4,7 @@ import { label } from "../format";
 import type { TranslationKey } from "../i18n";
 import type { AppInfo, Page } from "../types";
 import type { T } from "../uiTypes";
+import { Plus } from "lucide-react";
 
 export function Toolbar({
   appId,
@@ -13,6 +14,8 @@ export function Toolbar({
   onChooseApp,
   onPreviousApp,
   onNextApp,
+  onCreateJob,
+  createDisabled,
   onRefresh,
   t,
 }: {
@@ -23,6 +26,8 @@ export function Toolbar({
   onChooseApp: (appId: string) => void;
   onPreviousApp: () => void;
   onNextApp: () => void;
+  onCreateJob: () => void;
+  createDisabled: boolean;
   onRefresh: () => void;
   t: T;
 }) {
@@ -87,6 +92,18 @@ export function Toolbar({
       </div>
       <div className="toolbar-actions">
         <span className="readonly">{t("readonly")}</span>
+        <Button
+          size="xs"
+          type="button"
+          disabled={createDisabled}
+          onClick={onCreateJob}
+        >
+          <Plus
+            size={14}
+            aria-hidden="true"
+          />{" "}
+          {t("newJob")}
+        </Button>
         <Button
           size="xs"
           type="button"

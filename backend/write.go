@@ -236,6 +236,61 @@ func updateJobPayload(job map[string]any, changes map[string]any) error {
 	return nil
 }
 
+func newJobPayload(appID string) map[string]any {
+	return map[string]any{
+		"appId":                  json.Number(appID),
+		"jobName":                "",
+		"jobDescription":         "",
+		"jobParams":              "",
+		"timeExpressionType":     "",
+		"timeExpression":         "",
+		"executeType":            "",
+		"processorType":          "",
+		"processorInfo":          "",
+		"maxInstanceNum":         json.Number("0"),
+		"concurrency":            json.Number("5"),
+		"instanceTimeLimit":      json.Number("0"),
+		"instanceRetryNum":       json.Number("0"),
+		"taskRetryNum":           json.Number("1"),
+		"dispatchStrategy":       "HEALTH_FIRST",
+		"dispatchStrategyConfig": "",
+		"minCpuCores":            json.Number("0"),
+		"minMemorySpace":         json.Number("0"),
+		"minDiskSpace":           json.Number("0"),
+		"enable":                 true,
+		"designatedWorkers":      "",
+		"maxWorkerCount":         json.Number("0"),
+		"lifeCycle":              nil,
+		"alarmConfig": map[string]any{
+			"alertThreshold": json.Number("0"), "statisticWindowLen": json.Number("0"), "silenceWindowLen": json.Number("0"),
+		},
+		"logConfig": map[string]any{"type": json.Number("1")},
+	}
+}
+
+func (s *session) createJob(appID string, values map[string]any) (string, error) {
+	job := newJobPayload(appID)
+	if err := updateJobPayload(job, values); err != nil {
+		return "", err
+	}
+	data, err := s.request("POST", "/job/save", appID, nil, job)
+	if err != nil {
+		return "", err
+	}
+	var savedID any
+	if err := decodeData(data, &savedID); err != nil {
+		return "", err
+	}
+	if savedID == nil {
+		return "", nil
+	}
+	jobID := asString(savedID)
+	if !numericID.MatchString(jobID) {
+		return "", errors.New("PowerJob returned an unexpected saved job ID")
+	}
+	return jobID, nil
+}
+
 func (s *session) updateJob(appID, jobID string, changes map[string]any) error {
 	if err := validateJobChanges(changes); err != nil {
 		return err
@@ -298,6 +353,20 @@ func (s *session) write(method string, params map[string]any) (any, error) {
 		return nil, err
 	}
 	switch method {
+	case "powerjob/createJob":
+		values, ok := params["job"].(map[string]any)
+		if !ok {
+			return nil, errors.New("invalid job configuration")
+		}
+		jobID, err := s.createJob(appID, values)
+		if err != nil {
+			return nil, err
+		}
+		result := map[string]any{"success": true}
+		if jobID != "" {
+			result["jobId"] = jobID
+		}
+		return result, nil
 	case "powerjob/updateJob":
 		jobID, err := requiredID(params, "jobId")
 		if err != nil {

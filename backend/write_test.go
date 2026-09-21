@@ -91,6 +91,58 @@ func TestUpdateJobAppliesOnlyEditableChangesAndVerifiesState(t *testing.T) {
 	}
 }
 
+func TestCreateJobUsesOfficialDefaultsAndAcceptsNullSaveResult(t *testing.T) {
+	var saved map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" || r.URL.Path != "/job/save" {
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+		if r.Header.Get("AppId") != "2" || r.Header.Get("PowerJwt") != "token" {
+			t.Error("missing scoped authorization headers")
+		}
+		decoder := json.NewDecoder(r.Body)
+		decoder.UseNumber()
+		if err := decoder.Decode(&saved); err != nil {
+			t.Fatal(err)
+		}
+		fmt.Fprint(w, `{"success":true,"data":null}`)
+	}))
+	defer server.Close()
+
+	s := &session{baseURL: server.URL, client: server.Client(), jwt: "token"}
+	result, err := s.write("powerjob/createJob", map[string]any{
+		"appId": "2",
+		"job": map[string]any{
+			"jobName": "demo", "timeExpressionType": "API", "executeType": "STANDALONE",
+			"processorType": "BUILT_IN", "processorInfo": "tech.example.Demo", "concurrency": json.Number("8"),
+		},
+	})
+	if err != nil || result.(map[string]any)["success"] != true {
+		t.Fatalf("unexpected create result: %#v, %v", result, err)
+	}
+	if saved["id"] != nil || saved["appId"] != json.Number("2") || saved["jobName"] != "demo" ||
+		saved["enable"] != true || saved["concurrency"] != json.Number("8") ||
+		saved["taskRetryNum"] != json.Number("1") || saved["dispatchStrategy"] != "HEALTH_FIRST" {
+		t.Fatalf("unexpected created job: %#v", saved)
+	}
+	alarm := saved["alarmConfig"].(map[string]any)
+	if alarm["alertThreshold"] != json.Number("0") || alarm["statisticWindowLen"] != json.Number("0") || alarm["silenceWindowLen"] != json.Number("0") {
+		t.Fatalf("unexpected alarm defaults: %#v", alarm)
+	}
+}
+
+func TestCreateJobRejectsInvalidConfigurationBeforeRequest(t *testing.T) {
+	s := &session{}
+	for _, job := range []map[string]any{
+		{"jobName": "missing required fields"},
+		{"jobName": "demo", "timeExpressionType": "API", "executeType": "STANDALONE", "processorType": "BUILT_IN", "processorInfo": "demo", "id": json.Number("7")},
+	} {
+		if _, err := s.write("powerjob/createJob", map[string]any{"appId": "2", "job": job}); err == nil {
+			t.Fatalf("accepted invalid job: %#v", job)
+		}
+	}
+}
+
 func TestUpdateJobRejectsNonEditableFieldsBeforeRequest(t *testing.T) {
 	s := &session{}
 	for _, changes := range []map[string]any{

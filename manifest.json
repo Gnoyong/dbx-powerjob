@@ -5,7 +5,7 @@
   "name": "PowerJob Workbench",
   "version": "0.1.16",
   "publisher": "local",
-  "description": "Browse and edit PowerJob jobs, inspect instances, run and toggle jobs, and retry failed normal instances.",
+  "description": "Create, browse, and edit PowerJob jobs; inspect instances, run and toggle jobs, and retry failed normal instances.",
   "icon": "assets/plugin.svg",
   "engines": { "host_api": "1" },
   "permissions": [],
@@ -80,7 +80,7 @@
       "type": "workbench",
       "id": "local.powerjob.readonly.workbench",
       "label": "PowerJob overview",
-      "description": "Browse applications, jobs, instances and logs; toggle jobs and retry failed normal instances.",
+      "description": "Create and manage jobs, browse applications, instances and logs, and retry failed normal instances.",
       "icon": "assets/plugin.svg"
     },
     {
@@ -93,7 +93,7 @@
   "localizations": {
     "zh-CN": {
       "name": "PowerJob 工作台",
-      "description": "查看 PowerJob 应用、任务、实例和日志，启停任务并重跑失败普通实例。",
+      "description": "新建并管理 PowerJob 任务，查看应用、实例和日志，启停任务并重跑失败普通实例。",
       "contributions": {
         "local.powerjob.readonly.connection": {
           "label": "PowerJob 连接",
@@ -112,7 +112,7 @@
         },
         "local.powerjob.readonly.workbench": {
           "label": "PowerJob 总览",
-          "description": "查看应用、任务、实例和日志，启停任务并重跑失败普通实例。"
+          "description": "新建并管理任务，查看应用、实例和日志，启停任务并重跑失败普通实例。"
         },
         "local.powerjob.readonly.apps": {
           "label": "查看应用"

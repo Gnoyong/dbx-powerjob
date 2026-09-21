@@ -30,6 +30,36 @@ type Tab = "detail" | "runs";
 type Filter = { type: InstanceType; instanceId: string; status: string };
 const jobsPaneStorageKey = "local.powerjob.readonly.jobs-pane-width";
 const instancePollIntervalMs = 3000;
+const newJobDefaults: JobDetail = {
+  jobName: "",
+  jobDescription: "",
+  enable: true,
+  timeExpressionType: "",
+  timeExpression: "",
+  executeType: "",
+  processorType: "",
+  processorInfo: "",
+  jobParams: "",
+  maxInstanceNum: 0,
+  concurrency: 5,
+  instanceTimeLimit: 0,
+  instanceRetryNum: 0,
+  taskRetryNum: 1,
+  dispatchStrategy: "HEALTH_FIRST",
+  dispatchStrategyConfig: "",
+  minCpuCores: 0,
+  minMemorySpace: 0,
+  minDiskSpace: 0,
+  designatedWorkers: "",
+  maxWorkerCount: 0,
+  lifeCycle: null,
+  alarmConfig: {
+    alertThreshold: 0,
+    statisticWindowLen: 0,
+    silenceWindowLen: 0,
+  },
+  logConfig: { type: 1, level: null, loggerName: "" },
+};
 
 function actionErrorKey(error: unknown): TranslationKey | null {
   const message = error instanceof Error ? error.message : "";
@@ -83,6 +113,7 @@ export default function App() {
   const [selectedInstanceId, setSelectedInstanceId] = useState("");
   const [modal, setModal] = useState<Instance | null>(null);
   const [runTarget, setRunTarget] = useState<Job | null>(null);
+  const [creating, setCreating] = useState(false);
   const [editError, setEditError] = useState<TranslationKey | null>(null);
   const [runError, setRunError] = useState<TranslationKey | null>(null);
   const [runInstanceId, setRunInstanceId] = useState("");
@@ -110,6 +141,7 @@ export default function App() {
   useEffect(() => {
     setRunTarget(null);
     setEditError(null);
+    setCreating(false);
   }, [connectionId, appId]);
 
   useEffect(() => {
@@ -368,6 +400,7 @@ export default function App() {
     });
   }
   function chooseApp(next: string) {
+    setCreating(false);
     setAppId(next);
     setJobsIndex(0);
     setDetail(null);
@@ -391,6 +424,7 @@ export default function App() {
     }
   }
   function chooseJob(job: Job) {
+    setCreating(false);
     if (String(job.id) === selectedJobId) return;
     setEditError(null);
     setSelectedJobId(String(job.id));
@@ -434,6 +468,43 @@ export default function App() {
       actionPending.current = false;
       setActionBusy(false);
     }
+  }
+
+  async function createJob(job: Record<string, unknown>) {
+    if (!connectionId || !appId || actionPending.current) return;
+    actionPending.current = true;
+    const scope = currentScope.current;
+    setActionBusy(true);
+    setActionStatus("creatingJob");
+    setActionError(null);
+    setEditError(null);
+    try {
+      await invoke(connectionId, "powerjob/createJob", { appId, job });
+      if (currentScope.current === scope) {
+        setCreating(false);
+        setActionStatus("jobCreated");
+        setRefresh((value) => value + 1);
+      }
+    } catch (error) {
+      if (currentScope.current === scope) {
+        setActionStatus("jobCreateFailed");
+        const key = actionErrorKey(error);
+        setActionError(key);
+        setEditError(key);
+      }
+    } finally {
+      actionPending.current = false;
+      setActionBusy(false);
+    }
+  }
+
+  function startCreatingJob() {
+    if (!connectionId || !appId || actionBusy) return;
+    setCreating(true);
+    setTab("detail");
+    setEditError(null);
+    setActionStatus(null);
+    setActionError(null);
   }
   function chooseInstance(instance: Instance) {
     setSelectedInstanceId(String(instance.instanceId));
@@ -593,6 +664,8 @@ export default function App() {
         onChooseApp={chooseApp}
         onPreviousApp={() => stepApp(-1)}
         onNextApp={() => stepApp(1)}
+        onCreateJob={startCreatingJob}
+        createDisabled={!connectionId || !appId || actionBusy}
         onRefresh={refreshCurrent}
         t={t}
       />
@@ -616,7 +689,7 @@ export default function App() {
         <div
           role="status"
           aria-live="polite"
-          className={`message ${actionStatus === "jobEnabled" || actionStatus === "jobDisabled" || actionStatus === "instanceRetried" || actionStatus === "jobRunRequested" || actionStatus === "jobUpdated" ? "success" : ""}`}
+          className={`message ${actionStatus === "jobEnabled" || actionStatus === "jobDisabled" || actionStatus === "instanceRetried" || actionStatus === "jobRunRequested" || actionStatus === "jobUpdated" || actionStatus === "jobCreated" ? "success" : ""}`}
         >
           {t(actionStatus, { id: runInstanceId })}
           {actionError && ` ${t(actionError)}`}
@@ -686,31 +759,35 @@ export default function App() {
             >
               <div className="detail-bar">
                 <strong>
-                  {selectedJob
+                  {creating
+                    ? t("newJob")
+                    : selectedJob
                     ? `${label(selectedJob.jobName)}  ·  #${selectedJob.id}`
                     : t("selectJob")}
                 </strong>
-                <nav
-                  className="detail-tabs"
-                  aria-label={t("jobInfo")}
-                >
-                  <Button
-                    type="button"
-                    className={tab === "detail" ? "active" : ""}
-                    aria-current={tab === "detail" ? "page" : undefined}
-                    onClick={() => setTab("detail")}
+                {!creating && (
+                  <nav
+                    className="detail-tabs"
+                    aria-label={t("jobInfo")}
                   >
-                    {t("jobDetail")}
-                  </Button>
-                  <Button
-                    type="button"
-                    className={tab === "runs" ? "active" : ""}
-                    aria-current={tab === "runs" ? "page" : undefined}
-                    onClick={() => setTab("runs")}
-                  >
-                    {t("runsAndLogs")}
-                  </Button>
-                </nav>
+                    <Button
+                      type="button"
+                      className={tab === "detail" ? "active" : ""}
+                      aria-current={tab === "detail" ? "page" : undefined}
+                      onClick={() => setTab("detail")}
+                    >
+                      {t("jobDetail")}
+                    </Button>
+                    <Button
+                      type="button"
+                      className={tab === "runs" ? "active" : ""}
+                      aria-current={tab === "runs" ? "page" : undefined}
+                      onClick={() => setTab("runs")}
+                    >
+                      {t("runsAndLogs")}
+                    </Button>
+                  </nav>
+                )}
               </div>
               <section
                 className="job-detail-view"
@@ -718,9 +795,15 @@ export default function App() {
                 hidden={tab !== "detail"}
               >
                 <JobInspector
-                  key={`${appId}:${selectedJobId}:${refresh}`}
+                  key={
+                    creating
+                      ? `create:${appId}`
+                      : `${appId}:${selectedJobId}:${refresh}`
+                  }
                   detail={
-                    detail && String(detail.id) === selectedJobId
+                    creating
+                      ? newJobDefaults
+                      : detail && String(detail.id) === selectedJobId
                       ? {
                           ...detail,
                           enable: selectedJob?.enable ?? detail.enable,
@@ -728,16 +811,25 @@ export default function App() {
                       : null
                   }
                   status={detailStatus}
+                  mode={creating ? "create" : "edit"}
                   busy={actionBusy}
                   error={editError}
-                  onSave={updateJob}
+                  onSave={creating ? createJob : updateJob}
                   onEdit={() => setEditError(null)}
+                  onCancel={
+                    creating
+                      ? () => {
+                          setCreating(false);
+                          setEditError(null);
+                        }
+                      : undefined
+                  }
                   locale={locale}
                   t={t}
                 />
               </section>
               <RunsPane
-                visible={tab === "runs"}
+                visible={!creating && tab === "runs"}
                 instances={instances}
                 loading={instancesLoading}
                 status={instancesStatus}
