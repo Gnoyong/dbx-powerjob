@@ -52,14 +52,25 @@ const scheduleFields = [
   ["timeExpressionType", "timeExpressionType"],
   ["timeExpression", "timeExpression"],
 ] as const;
-const idFields = [["id", "jobId"], ["appId", "appId"]] as const;
+const idFields = [
+  ["id", "jobId"],
+  ["appId", "appId"],
+] as const;
 const resourceFields = [
   ["minCpuCores", "minCpuCores"],
   ["minMemorySpace", "minMemorySpace"],
   ["minDiskSpace", "minDiskSpace"],
 ] as const;
-const runtimeNumberFields = ["maxInstanceNum", "concurrency", "instanceTimeLimit"] as const;
-const runtimeFields = [...runtimeNumberFields, "dispatchStrategy", "dispatchStrategyConfig"] as const;
+const runtimeNumberFields = [
+  "maxInstanceNum",
+  "concurrency",
+  "instanceTimeLimit",
+] as const;
+const runtimeFields = [
+  ...runtimeNumberFields,
+  "dispatchStrategy",
+  "dispatchStrategyConfig",
+] as const;
 type ConfigField = {
   name: string;
   title: TranslationKey;
@@ -159,7 +170,7 @@ function JobForm({
   error,
   onSave,
   onEdit,
-  onCancel,
+  formId,
   locale,
   t,
 }: {
@@ -169,7 +180,7 @@ function JobForm({
   error: TranslationKey | null;
   onSave: (changes: Record<string, unknown>) => void;
   onEdit: () => void;
-  onCancel?: () => void;
+  formId?: string;
   locale: Locale;
   t: T;
 }) {
@@ -300,11 +311,17 @@ function JobForm({
     .filter(Boolean)
     .join(" – ");
   const showScheduleRow = scheduleFields.every(([field]) => field in detail);
+  const showEnabledInSchedule =
+    showScheduleRow && "enable" in detail && typeof detail.enable === "boolean";
   const showResourceRow = resourceFields.every(([field]) => field in detail);
-  const showProcessorRow = "processorType" in detail && "processorInfo" in detail;
-  const showExecuteTypeInExecution = showProcessorRow && "executeType" in detail;
-  const showWorkerRow = "designatedWorkers" in detail && "maxWorkerCount" in detail;
-  const showDispatchRow = "dispatchStrategy" in detail && "dispatchStrategyConfig" in detail;
+  const showProcessorRow =
+    "processorType" in detail && "processorInfo" in detail;
+  const showExecuteTypeInExecution =
+    showProcessorRow && "executeType" in detail;
+  const showWorkerRow =
+    "designatedWorkers" in detail && "maxWorkerCount" in detail;
+  const showDispatchRow =
+    "dispatchStrategy" in detail && "dispatchStrategyConfig" in detail;
   const showRetryRow = "instanceRetryNum" in detail && "taskRetryNum" in detail;
   const showRuntimeRow = runtimeFields.every((field) => field in detail);
   const showTimestampsRow = "gmtCreate" in detail && "gmtModified" in detail;
@@ -315,63 +332,42 @@ function JobForm({
 
   return (
     <form
+      id={formId}
       className="detail-scroll job-edit-form"
       onSubmit={submit}
     >
-      <div className="job-edit-actions">
-        {mode === "create" && onCancel && (
+      {mode === "edit" && (
+        <div className="job-edit-actions">
           <Button
             size="xs"
-            variant="ghost"
+            variant="secondary"
             type="button"
-            disabled={busy}
-            title={t("cancel")}
-            onClick={onCancel}
+            disabled={busy || dirtyFields.length === 0}
+            title={t("resetJob")}
+            onClick={reset}
           >
-            <X
+            <RotateCcw
               size={14}
               aria-hidden="true"
             />{" "}
-            {t("cancel")}
+            {t("resetJob")}
           </Button>
-        )}
-        <Button
-          size="xs"
-          variant="secondary"
-          type="button"
-          disabled={busy || dirtyFields.length === 0}
-          title={t("resetJob")}
-          onClick={reset}
-        >
-          <RotateCcw
-            size={14}
-            aria-hidden="true"
-          />{" "}
-          {t("resetJob")}
-        </Button>
-        {(mode === "create" || dirtyFields.length > 0) && (
-          <Button
-            size="xs"
-            type="submit"
-            disabled={busy}
-            title={t("saveJob")}
-          >
-            <Save
-              size={14}
-              aria-hidden="true"
-            />{" "}
-            {t(
-              busy
-                ? mode === "create"
-                  ? "creatingJob"
-                  : "savingJob"
-                : mode === "create"
-                  ? "createJob"
-                  : "saveJob",
-            )}
-          </Button>
-        )}
-      </div>
+          {dirtyFields.length > 0 && (
+            <Button
+              size="xs"
+              type="submit"
+              disabled={busy}
+              title={t("saveJob")}
+            >
+              <Save
+                size={14}
+                aria-hidden="true"
+              />{" "}
+              {t(busy ? "savingJob" : "saveJob")}
+            </Button>
+          )}
+        </div>
+      )}
       {(validationError || error) && (
         <p
           className="job-edit-error"
@@ -406,39 +402,97 @@ function JobForm({
                   </tr>
                 );
               }
+              if (showEnabledInSchedule && field === "enable") return null;
               if (showScheduleRow && field === "timeExpression") return null;
               if (showScheduleRow && field === "timeExpressionType") {
                 return (
-                  <tr key="schedule" className="job-schedule-row">
+                  <tr
+                    key="schedule"
+                    className="job-schedule-row"
+                  >
                     <th scope="row">{t("scheduleConfig")}</th>
                     <td>
                       <div className="job-inline-fields">
-                        {scheduleFields.map(([scheduleField, scheduleTitle]) => {
-                          const choices = options[scheduleField];
-                          return (
-                            <label key={scheduleField}>
-                              <span>{t(scheduleTitle)}</span>
-                              {choices ? (
-                                <select value={values[scheduleField] ?? ""} disabled={busy}
-                                  onChange={(event) => setField(scheduleField, event.target.value)}>
-                                  {!choices.includes(values[scheduleField] ?? "") && (
-                                    <option value={values[scheduleField]}>{values[scheduleField]}</option>
-                                  )}
-                                  {choices.map((option) => <option key={option} value={option}>{option}</option>)}
-                                </select>
-                              ) : (
-                                <input type="text" value={values[scheduleField] ?? ""} maxLength={65536} disabled={busy}
-                                  onChange={(event) => setField(scheduleField, event.target.value)} />
-                              )}
-                            </label>
-                          );
-                        })}
+                        {showEnabledInSchedule && (
+                          <label className="job-schedule-enabled">
+                            <span>{t("enabled")}</span>
+                            <div className="job-switch-row">
+                              <Switch
+                                aria-label={t("enabled")}
+                                checked={values.enable === "true"}
+                                disabled={busy}
+                                onCheckedChange={(checked) =>
+                                  setField("enable", String(checked))
+                                }
+                              />
+                              <span>
+                                {t(
+                                  values.enable === "true"
+                                    ? "enabled"
+                                    : "disabled",
+                                )}
+                              </span>
+                            </div>
+                          </label>
+                        )}
+                        {scheduleFields.map(
+                          ([scheduleField, scheduleTitle]) => {
+                            const choices = options[scheduleField];
+                            return (
+                              <label key={scheduleField}>
+                                <span>{t(scheduleTitle)}</span>
+                                {choices ? (
+                                  <select
+                                    value={values[scheduleField] ?? ""}
+                                    disabled={busy}
+                                    onChange={(event) =>
+                                      setField(
+                                        scheduleField,
+                                        event.target.value,
+                                      )
+                                    }
+                                  >
+                                    {!choices.includes(
+                                      values[scheduleField] ?? "",
+                                    ) && (
+                                      <option value={values[scheduleField]}>
+                                        {values[scheduleField]}
+                                      </option>
+                                    )}
+                                    {choices.map((option) => (
+                                      <option
+                                        key={option}
+                                        value={option}
+                                      >
+                                        {option}
+                                      </option>
+                                    ))}
+                                  </select>
+                                ) : (
+                                  <input
+                                    type="text"
+                                    value={values[scheduleField] ?? ""}
+                                    maxLength={65536}
+                                    disabled={busy}
+                                    onChange={(event) =>
+                                      setField(
+                                        scheduleField,
+                                        event.target.value,
+                                      )
+                                    }
+                                  />
+                                )}
+                              </label>
+                            );
+                          },
+                        )}
                       </div>
                     </td>
                   </tr>
                 );
               }
-              if (showExecuteTypeInExecution && field === "executeType") return null;
+              if (showExecuteTypeInExecution && field === "executeType")
+                return null;
               if (showProcessorRow && field === "processorInfo") return null;
               if (showProcessorRow && field === "processorType") {
                 return (
@@ -449,49 +503,102 @@ function JobForm({
                         {showExecuteTypeInExecution && (
                           <label>
                             <span>{t("executeType")}</span>
-                            <select value={values.executeType ?? ""} disabled={busy}
-                              onChange={(event) => setField("executeType", event.target.value)}>
-                              {!executeChoices.includes(values.executeType ?? "") && (
-                                <option value={values.executeType}>{values.executeType}</option>
+                            <select
+                              value={values.executeType ?? ""}
+                              disabled={busy}
+                              onChange={(event) =>
+                                setField("executeType", event.target.value)
+                              }
+                            >
+                              {!executeChoices.includes(
+                                values.executeType ?? "",
+                              ) && (
+                                <option value={values.executeType}>
+                                  {values.executeType}
+                                </option>
                               )}
-                              {executeChoices.map((option) => <option key={option} value={option}>{option}</option>)}
+                              {executeChoices.map((option) => (
+                                <option
+                                  key={option}
+                                  value={option}
+                                >
+                                  {option}
+                                </option>
+                              ))}
                             </select>
                           </label>
                         )}
                         <label>
                           <span>{t("processorType")}</span>
-                          <select value={values.processorType ?? ""} disabled={busy}
-                            onChange={(event) => setField("processorType", event.target.value)}>
-                            {!processorChoices.includes(values.processorType ?? "") && (
-                              <option value={values.processorType}>{values.processorType}</option>
+                          <select
+                            value={values.processorType ?? ""}
+                            disabled={busy}
+                            onChange={(event) =>
+                              setField("processorType", event.target.value)
+                            }
+                          >
+                            {!processorChoices.includes(
+                              values.processorType ?? "",
+                            ) && (
+                              <option value={values.processorType}>
+                                {values.processorType}
+                              </option>
                             )}
-                            {processorChoices.map((option) => <option key={option} value={option}>{option}</option>)}
+                            {processorChoices.map((option) => (
+                              <option
+                                key={option}
+                                value={option}
+                              >
+                                {option}
+                              </option>
+                            ))}
                           </select>
                         </label>
                         <label>
                           <span>{t("processorInfo")}</span>
-                          <input type="text" value={values.processorInfo ?? ""} maxLength={65536} disabled={busy}
-                            onChange={(event) => setField("processorInfo", event.target.value)} />
+                          <input
+                            type="text"
+                            value={values.processorInfo ?? ""}
+                            maxLength={65536}
+                            disabled={busy}
+                            onChange={(event) =>
+                              setField("processorInfo", event.target.value)
+                            }
+                          />
                         </label>
                       </div>
                     </td>
                   </tr>
                 );
               }
-              if (showResourceRow && (field === "minMemorySpace" || field === "minDiskSpace")) return null;
+              if (
+                showResourceRow &&
+                (field === "minMemorySpace" || field === "minDiskSpace")
+              )
+                return null;
               if (showResourceRow && field === "minCpuCores") {
                 return (
                   <tr key="resources">
                     <th scope="row">{t("machineConfig")}</th>
                     <td>
                       <div className="job-inline-fields job-machine-fields">
-                        {resourceFields.map(([resourceField, resourceTitle]) => (
-                          <label key={resourceField}>
-                            <span>{t(resourceTitle)}</span>
-                            <input type="number" min={0} step="any" value={values[resourceField] ?? ""}
-                              disabled={busy} onChange={(event) => setField(resourceField, event.target.value)} />
-                          </label>
-                        ))}
+                        {resourceFields.map(
+                          ([resourceField, resourceTitle]) => (
+                            <label key={resourceField}>
+                              <span>{t(resourceTitle)}</span>
+                              <input
+                                type="number"
+                                min={0}
+                                step="any"
+                                value={values[resourceField] ?? ""}
+                                disabled={busy}
+                                onChange={(event) =>
+                                  setField(resourceField, event.target.value)
+                                }
+                              />
+                            </label>
+                          ),
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -506,20 +613,40 @@ function JobForm({
                       <div className="job-inline-fields">
                         <label>
                           <span>{t("designatedWorkers")}</span>
-                          <input type="text" value={values.designatedWorkers ?? ""} maxLength={65536} disabled={busy}
-                            onChange={(event) => setField("designatedWorkers", event.target.value)} />
+                          <input
+                            type="text"
+                            value={values.designatedWorkers ?? ""}
+                            maxLength={65536}
+                            disabled={busy}
+                            onChange={(event) =>
+                              setField("designatedWorkers", event.target.value)
+                            }
+                          />
                         </label>
                         <label>
                           <span>{t("maxWorkerCount")}</span>
-                          <input type="number" min={0} step="1" value={values.maxWorkerCount ?? ""} disabled={busy}
-                            onChange={(event) => setField("maxWorkerCount", event.target.value)} />
+                          <input
+                            type="number"
+                            min={0}
+                            step="1"
+                            value={values.maxWorkerCount ?? ""}
+                            disabled={busy}
+                            onChange={(event) =>
+                              setField("maxWorkerCount", event.target.value)
+                            }
+                          />
                         </label>
                       </div>
                     </td>
                   </tr>
                 );
               }
-              if (showRuntimeRow && field !== "maxInstanceNum" && runtimeFields.some((runtimeField) => runtimeField === field)) return null;
+              if (
+                showRuntimeRow &&
+                field !== "maxInstanceNum" &&
+                runtimeFields.some((runtimeField) => runtimeField === field)
+              )
+                return null;
               if (showRuntimeRow && field === "maxInstanceNum") {
                 return (
                   <tr key="runtime">
@@ -529,31 +656,66 @@ function JobForm({
                         {runtimeNumberFields.map((runtimeField) => (
                           <label key={runtimeField}>
                             <span>{t(runtimeField)}</span>
-                            <input type="number" min={0} step="1" value={values[runtimeField] ?? ""} disabled={busy}
-                              onChange={(event) => setField(runtimeField, event.target.value)} />
+                            <input
+                              type="number"
+                              min={0}
+                              step="1"
+                              value={values[runtimeField] ?? ""}
+                              disabled={busy}
+                              onChange={(event) =>
+                                setField(runtimeField, event.target.value)
+                              }
+                            />
                           </label>
                         ))}
                         <label>
                           <span>{t("dispatchStrategy")}</span>
-                          <select value={values.dispatchStrategy ?? ""} disabled={busy}
-                            onChange={(event) => setField("dispatchStrategy", event.target.value)}>
-                            {!dispatchChoices.includes(values.dispatchStrategy ?? "") && (
-                              <option value={values.dispatchStrategy}>{values.dispatchStrategy}</option>
+                          <select
+                            value={values.dispatchStrategy ?? ""}
+                            disabled={busy}
+                            onChange={(event) =>
+                              setField("dispatchStrategy", event.target.value)
+                            }
+                          >
+                            {!dispatchChoices.includes(
+                              values.dispatchStrategy ?? "",
+                            ) && (
+                              <option value={values.dispatchStrategy}>
+                                {values.dispatchStrategy}
+                              </option>
                             )}
-                            {dispatchChoices.map((option) => <option key={option} value={option}>{option}</option>)}
+                            {dispatchChoices.map((option) => (
+                              <option
+                                key={option}
+                                value={option}
+                              >
+                                {option}
+                              </option>
+                            ))}
                           </select>
                         </label>
                         <label>
                           <span>{t("dispatchStrategyConfig")}</span>
-                          <input type="text" value={values.dispatchStrategyConfig ?? ""} maxLength={65536} disabled={busy}
-                            onChange={(event) => setField("dispatchStrategyConfig", event.target.value)} />
+                          <input
+                            type="text"
+                            value={values.dispatchStrategyConfig ?? ""}
+                            maxLength={65536}
+                            disabled={busy}
+                            onChange={(event) =>
+                              setField(
+                                "dispatchStrategyConfig",
+                                event.target.value,
+                              )
+                            }
+                          />
                         </label>
                       </div>
                     </td>
                   </tr>
                 );
               }
-              if (showDispatchRow && field === "dispatchStrategyConfig") return null;
+              if (showDispatchRow && field === "dispatchStrategyConfig")
+                return null;
               if (showDispatchRow && field === "dispatchStrategy") {
                 return (
                   <tr key="dispatch">
@@ -561,18 +723,44 @@ function JobForm({
                       <div className="job-inline-fields job-paired-fields">
                         <label>
                           <span>{t("dispatchStrategy")}</span>
-                          <select value={values.dispatchStrategy ?? ""} disabled={busy}
-                            onChange={(event) => setField("dispatchStrategy", event.target.value)}>
-                            {!dispatchChoices.includes(values.dispatchStrategy ?? "") && (
-                              <option value={values.dispatchStrategy}>{values.dispatchStrategy}</option>
+                          <select
+                            value={values.dispatchStrategy ?? ""}
+                            disabled={busy}
+                            onChange={(event) =>
+                              setField("dispatchStrategy", event.target.value)
+                            }
+                          >
+                            {!dispatchChoices.includes(
+                              values.dispatchStrategy ?? "",
+                            ) && (
+                              <option value={values.dispatchStrategy}>
+                                {values.dispatchStrategy}
+                              </option>
                             )}
-                            {dispatchChoices.map((option) => <option key={option} value={option}>{option}</option>)}
+                            {dispatchChoices.map((option) => (
+                              <option
+                                key={option}
+                                value={option}
+                              >
+                                {option}
+                              </option>
+                            ))}
                           </select>
                         </label>
                         <label>
                           <span>{t("dispatchStrategyConfig")}</span>
-                          <input type="text" value={values.dispatchStrategyConfig ?? ""} maxLength={65536} disabled={busy}
-                            onChange={(event) => setField("dispatchStrategyConfig", event.target.value)} />
+                          <input
+                            type="text"
+                            value={values.dispatchStrategyConfig ?? ""}
+                            maxLength={65536}
+                            disabled={busy}
+                            onChange={(event) =>
+                              setField(
+                                "dispatchStrategyConfig",
+                                event.target.value,
+                              )
+                            }
+                          />
                         </label>
                       </div>
                     </td>
@@ -588,13 +776,29 @@ function JobForm({
                       <div className="job-inline-fields job-retry-fields">
                         <label>
                           <span>{t("instanceRetryNum")}</span>
-                          <input type="number" min={0} step="1" value={values.instanceRetryNum ?? ""} disabled={busy}
-                            onChange={(event) => setField("instanceRetryNum", event.target.value)} />
+                          <input
+                            type="number"
+                            min={0}
+                            step="1"
+                            value={values.instanceRetryNum ?? ""}
+                            disabled={busy}
+                            onChange={(event) =>
+                              setField("instanceRetryNum", event.target.value)
+                            }
+                          />
                         </label>
                         <label>
                           <span>{t("taskRetryNum")}</span>
-                          <input type="number" min={0} step="1" value={values.taskRetryNum ?? ""} disabled={busy}
-                            onChange={(event) => setField("taskRetryNum", event.target.value)} />
+                          <input
+                            type="number"
+                            min={0}
+                            step="1"
+                            value={values.taskRetryNum ?? ""}
+                            disabled={busy}
+                            onChange={(event) =>
+                              setField("taskRetryNum", event.target.value)
+                            }
+                          />
                         </label>
                       </div>
                     </td>
@@ -607,12 +811,16 @@ function JobForm({
                   <tr key="timestamps">
                     <td colSpan={2}>
                       <dl className="job-inline-fields job-readonly-fields">
-                        {(["gmtCreate", "gmtModified"] as const).map((timestampField) => (
-                          <div key={timestampField}>
-                            <dt>{t(timestampField)}</dt>
-                            <dd>{jobDateLabel(detail[timestampField], locale)}</dd>
-                          </div>
-                        ))}
+                        {(["gmtCreate", "gmtModified"] as const).map(
+                          (timestampField) => (
+                            <div key={timestampField}>
+                              <dt>{t(timestampField)}</dt>
+                              <dd>
+                                {jobDateLabel(detail[timestampField], locale)}
+                              </dd>
+                            </div>
+                          ),
+                        )}
                       </dl>
                     </td>
                   </tr>
@@ -893,7 +1101,7 @@ export function JobInspector({
   error,
   onSave,
   onEdit,
-  onCancel,
+  formId,
   locale,
   t,
 }: {
@@ -904,7 +1112,7 @@ export function JobInspector({
   error: TranslationKey | null;
   onSave: (changes: Record<string, unknown>) => void;
   onEdit: () => void;
-  onCancel?: () => void;
+  formId?: string;
   locale: Locale;
   t: T;
 }) {
@@ -918,7 +1126,7 @@ export function JobInspector({
       error={error}
       onSave={onSave}
       onEdit={onEdit}
-      onCancel={onCancel}
+      formId={formId}
       locale={locale}
       t={t}
     />

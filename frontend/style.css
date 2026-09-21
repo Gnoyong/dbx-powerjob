@@ -497,6 +497,11 @@ input[data-slot="input"][aria-invalid="true"] {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr));
 }
 
+.job-schedule-enabled .job-switch-row > span {
+  color: var(--color-foreground, #202631);
+  font-weight: 400;
+}
+
 .job-execution-fields {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr));
 }
@@ -976,6 +981,48 @@ input[data-slot="input"][aria-invalid="true"] {
   flex-direction: column;
   gap: 10px;
   font-size: 12px;
+}
+
+.create-job-dialog {
+  display: flex;
+  flex-direction: column;
+  width: min(980px, calc(100vw - 24px));
+  height: min(760px, calc(100vh - 24px));
+  max-height: calc(100vh - 24px);
+  padding: 0;
+  overflow: hidden;
+  font-size: 12px;
+}
+
+.create-job-dialog .dialog-head {
+  flex: 0 0 auto;
+  min-height: 45px;
+  padding: 8px 12px;
+}
+
+.create-job-dialog .dialog-head button {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+}
+
+.create-job-dialog .dialog-head button svg {
+  width: 16px;
+  height: 16px;
+}
+
+.create-job-dialog-body {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.create-job-dialog-footer {
+  display: flex;
+  flex: 0 0 auto;
+  justify-content: flex-end;
+  padding: 8px 12px;
+  border-top: 1px solid var(--color-border, #dce1e8);
+  background: var(--color-background, #fff);
 }
 
 .job-edit-actions {

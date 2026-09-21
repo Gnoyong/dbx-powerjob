@@ -25,42 +25,12 @@ import type { PanelSize } from "react-resizable-panels";
 import { JobInspector } from "./components/JobInspector";
 import { InstanceDialog } from "./components/InstanceDialog";
 import { RunJobDialog } from "./components/RunJobDialog";
+import { CreateJobDialog } from "./components/CreateJobDialog";
 
 type Tab = "detail" | "runs";
 type Filter = { type: InstanceType; instanceId: string; status: string };
 const jobsPaneStorageKey = "local.powerjob.readonly.jobs-pane-width";
 const instancePollIntervalMs = 3000;
-const newJobDefaults: JobDetail = {
-  jobName: "",
-  jobDescription: "",
-  enable: true,
-  timeExpressionType: "",
-  timeExpression: "",
-  executeType: "",
-  processorType: "",
-  processorInfo: "",
-  jobParams: "",
-  maxInstanceNum: 0,
-  concurrency: 5,
-  instanceTimeLimit: 0,
-  instanceRetryNum: 0,
-  taskRetryNum: 1,
-  dispatchStrategy: "HEALTH_FIRST",
-  dispatchStrategyConfig: "",
-  minCpuCores: 0,
-  minMemorySpace: 0,
-  minDiskSpace: 0,
-  designatedWorkers: "",
-  maxWorkerCount: 0,
-  lifeCycle: null,
-  alarmConfig: {
-    alertThreshold: 0,
-    statisticWindowLen: 0,
-    silenceWindowLen: 0,
-  },
-  logConfig: { type: 1, level: null, loggerName: "" },
-};
-
 function actionErrorKey(error: unknown): TranslationKey | null {
   const message = error instanceof Error ? error.message : "";
   if (/read.only/i.test(message)) return "readOnlyAction";
@@ -501,7 +471,6 @@ export default function App() {
   function startCreatingJob() {
     if (!connectionId || !appId || actionBusy) return;
     setCreating(true);
-    setTab("detail");
     setEditError(null);
     setActionStatus(null);
     setActionError(null);
@@ -759,35 +728,31 @@ export default function App() {
             >
               <div className="detail-bar">
                 <strong>
-                  {creating
-                    ? t("newJob")
-                    : selectedJob
+                  {selectedJob
                     ? `${label(selectedJob.jobName)}  ·  #${selectedJob.id}`
                     : t("selectJob")}
                 </strong>
-                {!creating && (
-                  <nav
-                    className="detail-tabs"
-                    aria-label={t("jobInfo")}
+                <nav
+                  className="detail-tabs"
+                  aria-label={t("jobInfo")}
+                >
+                  <Button
+                    type="button"
+                    className={tab === "detail" ? "active" : ""}
+                    aria-current={tab === "detail" ? "page" : undefined}
+                    onClick={() => setTab("detail")}
                   >
-                    <Button
-                      type="button"
-                      className={tab === "detail" ? "active" : ""}
-                      aria-current={tab === "detail" ? "page" : undefined}
-                      onClick={() => setTab("detail")}
-                    >
-                      {t("jobDetail")}
-                    </Button>
-                    <Button
-                      type="button"
-                      className={tab === "runs" ? "active" : ""}
-                      aria-current={tab === "runs" ? "page" : undefined}
-                      onClick={() => setTab("runs")}
-                    >
-                      {t("runsAndLogs")}
-                    </Button>
-                  </nav>
-                )}
+                    {t("jobDetail")}
+                  </Button>
+                  <Button
+                    type="button"
+                    className={tab === "runs" ? "active" : ""}
+                    aria-current={tab === "runs" ? "page" : undefined}
+                    onClick={() => setTab("runs")}
+                  >
+                    {t("runsAndLogs")}
+                  </Button>
+                </nav>
               </div>
               <section
                 className="job-detail-view"
@@ -795,15 +760,9 @@ export default function App() {
                 hidden={tab !== "detail"}
               >
                 <JobInspector
-                  key={
-                    creating
-                      ? `create:${appId}`
-                      : `${appId}:${selectedJobId}:${refresh}`
-                  }
+                  key={`${appId}:${selectedJobId}:${refresh}`}
                   detail={
-                    creating
-                      ? newJobDefaults
-                      : detail && String(detail.id) === selectedJobId
+                    detail && String(detail.id) === selectedJobId
                       ? {
                           ...detail,
                           enable: selectedJob?.enable ?? detail.enable,
@@ -811,25 +770,16 @@ export default function App() {
                       : null
                   }
                   status={detailStatus}
-                  mode={creating ? "create" : "edit"}
                   busy={actionBusy}
                   error={editError}
-                  onSave={creating ? createJob : updateJob}
+                  onSave={updateJob}
                   onEdit={() => setEditError(null)}
-                  onCancel={
-                    creating
-                      ? () => {
-                          setCreating(false);
-                          setEditError(null);
-                        }
-                      : undefined
-                  }
                   locale={locale}
                   t={t}
                 />
               </section>
               <RunsPane
-                visible={!creating && tab === "runs"}
+                visible={tab === "runs"}
                 instances={instances}
                 loading={instancesLoading}
                 status={instancesStatus}
@@ -861,6 +811,22 @@ export default function App() {
           </ResizablePanel>
         </ResizablePanelGroup>
       </main>
+      {creating && (
+        <CreateJobDialog
+          key={appId}
+          busy={actionBusy}
+          error={editError}
+          locale={locale}
+          onCreate={createJob}
+          onClose={() => {
+            if (actionBusy) return;
+            setCreating(false);
+            setEditError(null);
+          }}
+          onEdit={() => setEditError(null)}
+          t={t}
+        />
+      )}
       {modal && connectionId && (
         <InstanceDialog
           key={`${appId}:${modal.instanceId}`}

@@ -80,7 +80,6 @@ export function Toolbar({
         </span>
         <Button
           size="xs"
-
           type="button"
           variant="ghost"
           aria-label={t("nextApp")}
@@ -91,7 +90,7 @@ export function Toolbar({
         </Button>
       </div>
       <div className="toolbar-actions">
-        <span className="readonly">{t("readonly")}</span>
+        {/* <span className="readonly">{t("readonly")}</span> */}
         <Button
           size="xs"
           type="button"
