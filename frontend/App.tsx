@@ -399,7 +399,14 @@ export default function App() {
   }
 
   async function updateJob(changes: Record<string, unknown>) {
-    if (!connectionId || !appId || !selectedJobId || actionPending.current || !Object.keys(changes).length) return;
+    if (
+      !connectionId ||
+      !appId ||
+      !selectedJobId ||
+      actionPending.current ||
+      !Object.keys(changes).length
+    )
+      return;
     actionPending.current = true;
     const scope = currentScope.current;
     setActionBusy(true);
@@ -407,7 +414,11 @@ export default function App() {
     setActionError(null);
     setEditError(null);
     try {
-      await invoke(connectionId, "powerjob/updateJob", { appId, jobId: selectedJobId, changes });
+      await invoke(connectionId, "powerjob/updateJob", {
+        appId,
+        jobId: selectedJobId,
+        changes,
+      });
       if (currentScope.current === scope) {
         setActionStatus("jobUpdated");
         setRefresh((value) => value + 1);
@@ -666,7 +677,7 @@ export default function App() {
           <ResizablePanel
             id="details-panel"
             className="workspace-panel"
-            minSize={220}
+            minSize={520}
           >
             <section
               id="detail-pane"
