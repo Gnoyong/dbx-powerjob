@@ -46,6 +46,10 @@ PowerJob Web API 不是稳定公开契约。升级 PowerJob 后应重新验证�
 - **仅用于本机开发验证**：在 DBX「插件中心」显式启用 **Allow unsigned development packages**，再导入本地 `.dbxp`。只对确认来源的本地候选包使用，测试后关闭该选项。此设置不会改变官方 Marketplace 的签名验证。
 - **正式发布**：先确定稳定的插件 ID 和 publisher（当前 `local.powerjob.readonly` / `local` 是开发阶段占位值），把源码放入插件自己的 GitHub 仓库，创建版本标签和 Release。现有 `.github/workflows/plugin-release.yml` 会为支持的平台构建未签名候选包与 `release-candidates.json`。按 [DBX 官方发布流程](https://dbxio.com/en/docs/plugin-development#complete-official-marketplace-flow) 向 `t8y2/dbx-store` 提交候选信息；维护者审核后由受保护的 DBX Store 工作流签名，再下载签名后的包安装。插件作者不能自行获得官方私钥，也不能通过修改 Manifest 使当前候选包变成可信包。
 
+Gitea 仓库推送 `v*` 版本标签后，`.gitea/workflows/plugin-release.yml` 会校验标签与 `package.json`、`manifest.json` 的版本一致，构建候选包，并替换滚动的 `latest` Release。触发构建的版本 Git 标签会保留；Gitea Release 只使用 `latest` 标签。
+
+在 VS Code 中运行任务“发布新版本”可完成版本更新、提交、创建版本标签并原子推送。版本输入框默认显示当前版本的下一补丁版本；任务成功准备版本文件后会同步推进下次默认值。发版前工作区必须无未提交改动。
+
 当前仓库没有经过 DBX Store 签名的正式包，因此正式签名流程尚未完成。
 
 ## 开发与验证

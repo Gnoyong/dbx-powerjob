@@ -2,10 +2,26 @@
   "version": "2.0.0",
   "tasks": [
     {
+      "label": "检查 TypeScript",
+      "type": "shell",
+      "command": "pnpm",
+      "args": [
+        "run",
+        "typecheck"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
       "label": "构建插件前端",
       "type": "shell",
       "command": "pnpm",
-      "args": ["run", "build"],
+      "args": [
+        "run",
+        "build"
+      ],
       "options": {
         "cwd": "${workspaceFolder}"
       },
@@ -22,10 +38,6 @@
       ],
       "options": {
         "cwd": "${workspaceFolder}"
-        // "env": {
-        //   "GOCACHE": "${workspaceFolder}/backend/.go-cache",
-        //   "PATH": "C:\\Program Files\\Go\\bin;${env:PATH}"
-        // }
       },
       "dependsOn": "构建插件前端",
       "group": {
@@ -33,6 +45,32 @@
         "isDefault": true
       },
       "problemMatcher": []
+    },
+    {
+      "label": "发布新版本",
+      "type": "process",
+      "command": "node",
+      "args": [
+        "scripts/release.mjs",
+        "${input:releaseVersion}"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "检查 TypeScript",
+        "构建插件前端"
+      ],
+      "problemMatcher": []
+    }
+  ],
+  "inputs": [
+    {
+      "id": "releaseVersion",
+      "type": "promptString",
+      "description": "请输入新版本号（不含 v）",
+      "default": "0.1.18"
     }
   ]
 }
