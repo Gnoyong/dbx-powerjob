@@ -131,6 +131,77 @@ func TestCreateJobUsesOfficialDefaultsAndAcceptsNullSaveResult(t *testing.T) {
 	}
 }
 
+func TestCopyJobPreservesCompleteConfigurationAndAppliesDialogValues(t *testing.T) {
+	const copiedID = "981965114838090752"
+	var calls []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls = append(calls, r.Method+" "+r.URL.Path)
+		if r.Header.Get("AppId") != "2" || r.Header.Get("PowerJwt") != "token" {
+			t.Error("missing scoped authorization headers")
+		}
+		switch r.URL.Path {
+		case "/job/list":
+			var body map[string]any
+			decoder := json.NewDecoder(r.Body)
+			decoder.UseNumber()
+			if err := decoder.Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if body["jobId"] != json.Number("7") {
+				t.Fatalf("unexpected source job filter: %#v", body)
+			}
+			fmt.Fprint(w, `{"success":true,"data":{"data":[{"id":7,"appId":2,"enable":true,"jobName":"demo","jobDescription":"original","jobParams":"line1\nline2","timeExpressionType":"CRON","timeExpression":"0 0 * * * ?","executeType":"STANDALONE","processorType":"BUILT_IN","processorInfo":"tech.example.Demo","concurrency":2,"notifyUserIds":[2,4],"advancedRuntimeConfig":{"taskTrackerBehavior":11},"gmtCreate":1720000000000,"nextTriggerTimeStr":"tomorrow"}]}}`)
+		case "/job/save":
+			var saved map[string]any
+			decoder := json.NewDecoder(r.Body)
+			decoder.UseNumber()
+			if err := decoder.Decode(&saved); err != nil {
+				t.Fatal(err)
+			}
+			if _, ok := saved["id"]; ok {
+				t.Fatalf("copied source identity: %#v", saved)
+			}
+			if _, ok := saved["gmtCreate"]; ok {
+				t.Fatalf("copied server timestamp: %#v", saved)
+			}
+			if _, ok := saved["nextTriggerTimeStr"]; ok {
+				t.Fatalf("copied derived schedule field: %#v", saved)
+			}
+			if saved["appId"] != json.Number("2") || saved["jobName"] != "demo(1)" ||
+				saved["jobDescription"] != "edited before creation" || saved["concurrency"] != json.Number("9") ||
+				saved["jobParams"] != "line1\nline2" || saved["enable"] != true {
+				t.Fatalf("unexpected copied job: %#v", saved)
+			}
+			notify, ok := saved["notifyUserIds"].([]any)
+			if !ok || len(notify) != 2 || notify[0] != json.Number("2") || notify[1] != json.Number("4") {
+				t.Fatalf("notification configuration was not preserved: %#v", saved["notifyUserIds"])
+			}
+			advanced, ok := saved["advancedRuntimeConfig"].(map[string]any)
+			if !ok || advanced["taskTrackerBehavior"] != json.Number("11") {
+				t.Fatalf("advanced configuration was not preserved: %#v", saved["advancedRuntimeConfig"])
+			}
+			fmt.Fprintf(w, `{"success":true,"data":%s}`, copiedID)
+		default:
+			t.Fatalf("unexpected route: %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	s := &session{baseURL: server.URL, client: server.Client(), jwt: "token"}
+	result, err := s.write("powerjob/copyJob", map[string]any{
+		"appId": "2", "jobId": "7",
+		"job": map[string]any{
+			"jobName": "demo(1)", "jobDescription": "edited before creation", "concurrency": json.Number("9"),
+		},
+	})
+	if err != nil || result.(map[string]any)["jobId"] != copiedID {
+		t.Fatalf("unexpected copy result: %#v, %v", result, err)
+	}
+	if !reflect.DeepEqual(calls, []string{"POST /job/list", "POST /job/save"}) {
+		t.Fatalf("unexpected route sequence: %v", calls)
+	}
+}
+
 func TestCreateJobRejectsInvalidConfigurationBeforeRequest(t *testing.T) {
 	s := &session{}
 	for _, job := range []map[string]any{
@@ -160,6 +231,11 @@ func TestUpdateJobRejectsNonEditableFieldsBeforeRequest(t *testing.T) {
 		if _, err := s.write("powerjob/updateJob", map[string]any{"appId": "2", "jobId": "7", "changes": changes}); err == nil {
 			t.Fatalf("accepted unsafe changes: %#v", changes)
 		}
+	}
+	if _, err := s.write("powerjob/copyJob", map[string]any{
+		"appId": "2", "jobId": "7", "job": map[string]any{"id": "8"},
+	}); err == nil {
+		t.Fatal("accepted copied job identity override")
 	}
 }
 

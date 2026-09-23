@@ -983,6 +983,18 @@ input[data-slot="input"][aria-invalid="true"] {
   font-size: 12px;
 }
 
+.confirm-action-dialog {
+  width: min(420px, calc(100vw - 24px));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.confirm-action-dialog p {
+  margin: 0;
+}
+
 .create-job-dialog {
   display: flex;
   flex-direction: column;

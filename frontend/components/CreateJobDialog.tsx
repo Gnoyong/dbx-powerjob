@@ -37,8 +37,25 @@ const newJobDefaults: JobDetail = {
   logConfig: { type: 1, level: null, loggerName: "" },
 };
 
+function createInitialJob(source?: JobDetail): JobDetail {
+  if (!source) return newJobDefaults;
+  const initial: JobDetail = {};
+  for (const [field, fallback] of Object.entries(newJobDefaults)) {
+    initial[field] = field in source ? source[field] : fallback;
+  }
+  initial.jobName = `${String(source.jobName ?? "")}_copy`;
+  return initial;
+}
+
+function submitCreateJob() {
+  document
+    .getElementById("create-job-form")
+    ?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+}
+
 export function CreateJobDialog({
   busy,
+  copySource,
   error,
   locale,
   onCreate,
@@ -47,6 +64,7 @@ export function CreateJobDialog({
   t,
 }: {
   busy: boolean;
+  copySource?: JobDetail;
   error: TranslationKey | null;
   locale: Locale;
   onCreate: (job: Record<string, unknown>) => void;
@@ -54,6 +72,7 @@ export function CreateJobDialog({
   onEdit: () => void;
   t: T;
 }) {
+  const initialJob = createInitialJob(copySource);
   return (
     <Dialog
       open
@@ -63,7 +82,7 @@ export function CreateJobDialog({
     >
       <DialogContent className="create-job-dialog">
         <div className="dialog-head">
-          <DialogTitle>{t("newJob")}</DialogTitle>
+          <DialogTitle>{t(copySource ? "copyJob" : "newJob")}</DialogTitle>
           <DialogClose asChild>
             <Button
               size="xs"
@@ -78,7 +97,7 @@ export function CreateJobDialog({
         </div>
         <div className="create-job-dialog-body">
           <JobInspector
-            detail={newJobDefaults}
+            detail={initialJob}
             status="selectJobDetail"
             mode="create"
             busy={busy}
@@ -93,9 +112,9 @@ export function CreateJobDialog({
         <footer className="create-job-dialog-footer">
           <Button
             size="xs"
-            type="submit"
-            form="create-job-form"
+            type="button"
             disabled={busy}
+            onClick={submitCreateJob}
           >
             <Save
               size={14}

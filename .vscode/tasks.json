@@ -70,7 +70,7 @@
       "id": "releaseVersion",
       "type": "promptString",
       "description": "请输入新版本号（不含 v）",
-      "default": "0.1.18"
+      "default": "0.1.21"
     }
   ]
 }

@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useState } from "react";
 import { CalendarDays, RotateCcw, Save, X } from "lucide-react";
 import { format } from "date-fns";
 import { enUS, zhCN } from "date-fns/locale";
@@ -203,8 +203,7 @@ function JobForm({
     onEdit();
   };
 
-  function submit(event: FormEvent) {
-    event.preventDefault();
+  function submit() {
     if (
       !values.jobName?.trim() ||
       !values.processorInfo?.trim() ||
@@ -334,7 +333,10 @@ function JobForm({
     <form
       id={formId}
       className="detail-scroll job-edit-form"
-      onSubmit={submit}
+      onSubmit={(event) => {
+        event.preventDefault();
+        submit();
+      }}
     >
       {mode === "edit" && (
         <div className="job-edit-actions">
@@ -355,9 +357,10 @@ function JobForm({
           {dirtyFields.length > 0 && (
             <Button
               size="xs"
-              type="submit"
+              type="button"
               disabled={busy}
               title={t("saveJob")}
+              onClick={submit}
             >
               <Save
                 size={14}

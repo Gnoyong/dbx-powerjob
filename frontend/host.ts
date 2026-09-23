@@ -9,6 +9,7 @@ type MethodResult = {
   "powerjob/log": LogPage;
   "powerjob/setJobEnabled": { success: boolean };
   "powerjob/createJob": { success: boolean; jobId?: string };
+  "powerjob/copyJob": { success: boolean; jobId?: string };
   "powerjob/updateJob": { success: boolean };
   "powerjob/retryFailedInstance": { success: boolean };
   "powerjob/runJob": { instanceId: string };

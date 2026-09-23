@@ -26,9 +26,13 @@ import { JobInspector } from "./components/JobInspector";
 import { InstanceDialog } from "./components/InstanceDialog";
 import { RunJobDialog } from "./components/RunJobDialog";
 import { CreateJobDialog } from "./components/CreateJobDialog";
+import { ConfirmActionDialog } from "./components/ConfirmActionDialog";
 
 type Tab = "detail" | "runs";
 type Filter = { type: InstanceType; instanceId: string; status: string };
+type Confirmation =
+  | { kind: "jobEnabled"; job: Job; enabled: boolean }
+  | { kind: "retryInstance"; instance: Instance; jobId: string };
 const jobsPaneStorageKey = "local.powerjob.readonly.jobs-pane-width";
 const instancePollIntervalMs = 3000;
 function actionErrorKey(error: unknown): TranslationKey | null {
@@ -83,7 +87,12 @@ export default function App() {
   const [selectedInstanceId, setSelectedInstanceId] = useState("");
   const [modal, setModal] = useState<Instance | null>(null);
   const [runTarget, setRunTarget] = useState<Job | null>(null);
+  const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const [creating, setCreating] = useState(false);
+  const [copySource, setCopySource] = useState<{
+    jobId: string;
+    detail: JobDetail;
+  } | null>(null);
   const [editError, setEditError] = useState<TranslationKey | null>(null);
   const [runError, setRunError] = useState<TranslationKey | null>(null);
   const [runInstanceId, setRunInstanceId] = useState("");
@@ -112,6 +121,8 @@ export default function App() {
     setRunTarget(null);
     setEditError(null);
     setCreating(false);
+    setCopySource(null);
+    setConfirmation(null);
   }, [connectionId, appId]);
 
   useEffect(() => {
@@ -371,6 +382,7 @@ export default function App() {
   }
   function chooseApp(next: string) {
     setCreating(false);
+    setCopySource(null);
     setAppId(next);
     setJobsIndex(0);
     setDetail(null);
@@ -468,8 +480,72 @@ export default function App() {
     }
   }
 
+  async function copyJob(job: Record<string, unknown>) {
+    if (!connectionId || !appId || !copySource || actionPending.current)
+      return;
+    actionPending.current = true;
+    const scope = currentScope.current;
+    setActionBusy(true);
+    setActionStatus("creatingJob");
+    setActionError(null);
+    setEditError(null);
+    try {
+      await invoke(connectionId, "powerjob/copyJob", {
+        appId,
+        jobId: copySource.jobId,
+        job,
+      });
+      if (currentScope.current === scope) {
+        setCopySource(null);
+        setActionStatus("jobCopied");
+        setRefresh((value) => value + 1);
+      }
+    } catch (error) {
+      if (currentScope.current === scope) {
+        setActionStatus("jobCopyFailed");
+        const key = actionErrorKey(error);
+        setActionError(key);
+        setEditError(key ?? "jobCopyFailed");
+      }
+    } finally {
+      actionPending.current = false;
+      setActionBusy(false);
+    }
+  }
+
+  async function startCopyingJob(job: Job) {
+    if (!connectionId || !appId || actionPending.current) return;
+    actionPending.current = true;
+    const scope = currentScope.current;
+    setActionBusy(true);
+    setActionStatus("loadingJobCopy");
+    setActionError(null);
+    setEditError(null);
+    setCreating(false);
+    setCopySource(null);
+    try {
+      const value = await invoke(connectionId, "powerjob/job", {
+        appId,
+        jobId: job.id,
+      });
+      if (currentScope.current === scope) {
+        setCopySource({
+          jobId: String(job.id),
+          detail: { ...value, jobName: value.jobName ?? job.jobName ?? "" },
+        });
+        setActionStatus(null);
+      }
+    } catch {
+      if (currentScope.current === scope) setActionStatus("jobCopyLoadFailed");
+    } finally {
+      actionPending.current = false;
+      setActionBusy(false);
+    }
+  }
+
   function startCreatingJob() {
     if (!connectionId || !appId || actionBusy) return;
+    setCopySource(null);
     setCreating(true);
     setEditError(null);
     setActionStatus(null);
@@ -488,7 +564,7 @@ export default function App() {
     }
   }
 
-  async function setJobEnabled(job: Job) {
+  function requestSetJobEnabled(job: Job) {
     if (
       !connectionId ||
       !appId ||
@@ -496,16 +572,11 @@ export default function App() {
       actionPending.current
     )
       return;
-    const enabled = !job.enable;
-    if (
-      !window.confirm(
-        t(enabled ? "confirmEnableJob" : "confirmDisableJob", {
-          name: label(job.jobName),
-          id: job.id,
-        }),
-      )
-    )
-      return;
+    setConfirmation({ kind: "jobEnabled", job, enabled: !job.enable });
+  }
+
+  async function setJobEnabled(job: Job, enabled: boolean) {
+    if (!connectionId || !appId || actionPending.current) return;
     actionPending.current = true;
     const scope = currentScope.current;
     setActionBusy(true);
@@ -585,7 +656,7 @@ export default function App() {
     }
   }
 
-  async function retryFailedInstance(instance: Instance) {
+  function requestRetryFailedInstance(instance: Instance) {
     if (
       !connectionId ||
       !appId ||
@@ -594,8 +665,11 @@ export default function App() {
       filter.type !== "NORMAL"
     )
       return;
-    if (!window.confirm(t("confirmRetryFailed", { id: instance.instanceId })))
-      return;
+    setConfirmation({ kind: "retryInstance", instance, jobId: selectedJobId });
+  }
+
+  async function retryFailedInstance(instance: Instance, jobId: string) {
+    if (!connectionId || !appId || actionPending.current) return;
     actionPending.current = true;
     const scope = currentScope.current;
     setActionBusy(true);
@@ -604,7 +678,7 @@ export default function App() {
     try {
       await invoke(connectionId, "powerjob/retryFailedInstance", {
         appId,
-        jobId: selectedJobId,
+        jobId,
         instanceId: instance.instanceId,
       });
       if (currentScope.current === scope) {
@@ -658,7 +732,7 @@ export default function App() {
         <div
           role="status"
           aria-live="polite"
-          className={`message ${actionStatus === "jobEnabled" || actionStatus === "jobDisabled" || actionStatus === "instanceRetried" || actionStatus === "jobRunRequested" || actionStatus === "jobUpdated" || actionStatus === "jobCreated" ? "success" : ""}`}
+          className={`message ${actionStatus === "jobEnabled" || actionStatus === "jobDisabled" || actionStatus === "instanceRetried" || actionStatus === "jobRunRequested" || actionStatus === "jobUpdated" || actionStatus === "jobCreated" || actionStatus === "jobCopied" ? "success" : ""}`}
         >
           {t(actionStatus, { id: runInstanceId })}
           {actionError && ` ${t(actionError)}`}
@@ -702,7 +776,8 @@ export default function App() {
               onDraftKeywordChange={setDraftKeyword}
               onSearch={searchJobs}
               onChooseJob={chooseJob}
-              onSetJobEnabled={setJobEnabled}
+              onCopyJob={startCopyingJob}
+              onSetJobEnabled={requestSetJobEnabled}
               onRunJob={(job) => {
                 setRunError(null);
                 setRunTarget(job);
@@ -801,7 +876,7 @@ export default function App() {
                 onSearch={searchInstances}
                 onChooseInstance={chooseInstance}
                 onOpenInstance={setModal}
-                onRetryInstance={retryFailedInstance}
+                onRetryInstance={requestRetryFailedInstance}
                 busy={actionBusy}
                 logRefresh={instancesRefresh}
                 onPage={setInstanceIndex}
@@ -811,16 +886,18 @@ export default function App() {
           </ResizablePanel>
         </ResizablePanelGroup>
       </main>
-      {creating && (
+      {(creating || copySource) && (
         <CreateJobDialog
-          key={appId}
+          key={copySource ? `${appId}:${copySource.jobId}` : appId}
           busy={actionBusy}
+          copySource={copySource?.detail}
           error={editError}
           locale={locale}
-          onCreate={createJob}
+          onCreate={copySource ? copyJob : createJob}
           onClose={() => {
             if (actionBusy) return;
             setCreating(false);
+            setCopySource(null);
             setEditError(null);
           }}
           onEdit={() => setEditError(null)}
@@ -847,6 +924,47 @@ export default function App() {
           error={runError}
           onRun={runJob}
           onClose={() => setRunTarget(null)}
+          t={t}
+        />
+      )}
+      {confirmation && (
+        <ConfirmActionDialog
+          title={
+            confirmation.kind === "jobEnabled"
+              ? t(confirmation.enabled ? "enableJob" : "disableJob")
+              : t("retryFailed")
+          }
+          message={
+            confirmation.kind === "jobEnabled"
+              ? t(
+                  confirmation.enabled
+                    ? "confirmEnableJob"
+                    : "confirmDisableJob",
+                  {
+                    name: label(confirmation.job.jobName),
+                    id: confirmation.job.id,
+                  },
+                )
+              : t("confirmRetryFailed", {
+                  id: confirmation.instance.instanceId,
+                })
+          }
+          confirmLabel={
+            confirmation.kind === "jobEnabled"
+              ? t(confirmation.enabled ? "enableJob" : "disableJob")
+              : t("retryFailed")
+          }
+          busy={actionBusy}
+          onConfirm={() => {
+            const target = confirmation;
+            setConfirmation(null);
+            if (target.kind === "jobEnabled") {
+              void setJobEnabled(target.job, target.enabled);
+            } else {
+              void retryFailedInstance(target.instance, target.jobId);
+            }
+          }}
+          onClose={() => setConfirmation(null)}
           t={t}
         />
       )}

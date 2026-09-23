@@ -18,6 +18,7 @@ export function JobsPane({
   onDraftKeywordChange,
   onSearch,
   onChooseJob,
+  onCopyJob,
   onSetJobEnabled,
   onRunJob,
   busy,
@@ -32,6 +33,7 @@ export function JobsPane({
   onDraftKeywordChange: (value: string) => void;
   onSearch: () => void;
   onChooseJob: (job: Job) => void;
+  onCopyJob: (job: Job) => void;
   onSetJobEnabled: (job: Job) => void;
   onRunJob: (job: Job) => void;
   busy: boolean;
@@ -82,7 +84,7 @@ export function JobsPane({
     setMenu({
       job,
       x: Math.max(4, Math.min(x, window.innerWidth - 180)),
-      y: Math.max(4, Math.min(y, window.innerHeight - 76)),
+      y: Math.max(4, Math.min(y, window.innerHeight - 108)),
     });
   }
 
@@ -226,6 +228,19 @@ export function JobsPane({
             }}
           >
             {t("runJob")}
+          </Button>
+          <Button
+            size="xs"
+            type="button"
+            variant="ghost"
+            role="menuitem"
+            disabled={busy}
+            onClick={() => {
+              setMenu(null);
+              onCopyJob(menu.job);
+            }}
+          >
+            {t("copyJob")}
           </Button>
           <Button
             size="xs"

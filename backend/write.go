@@ -54,6 +54,19 @@ var editableJobObjectFields = map[string]bool{
 	"lifeCycle": true, "alarmConfig": true, "logConfig": true, "advancedRuntimeConfig": true,
 }
 
+var savableJobFields = map[string]bool{
+	"jobName": true, "jobDescription": true, "appId": true, "jobParams": true,
+	"timeExpressionType": true, "timeExpression": true,
+	"executeType": true, "processorType": true, "processorInfo": true,
+	"maxInstanceNum": true, "concurrency": true, "instanceTimeLimit": true,
+	"instanceRetryNum": true, "taskRetryNum": true,
+	"minCpuCores": true, "minMemorySpace": true, "minDiskSpace": true,
+	"enable": true, "designatedWorkers": true, "maxWorkerCount": true,
+	"notifyUserIds": true, "extra": true, "dispatchStrategy": true,
+	"dispatchStrategyConfig": true, "lifeCycle": true, "alarmConfig": true,
+	"tag": true, "logConfig": true, "advancedRuntimeConfig": true,
+}
+
 func optionalConfigNumber(value any, allowed ...int64) error {
 	if value == nil {
 		return nil
@@ -268,11 +281,7 @@ func newJobPayload(appID string) map[string]any {
 	}
 }
 
-func (s *session) createJob(appID string, values map[string]any) (string, error) {
-	job := newJobPayload(appID)
-	if err := updateJobPayload(job, values); err != nil {
-		return "", err
-	}
+func (s *session) saveNewJob(appID string, job map[string]any) (string, error) {
 	data, err := s.request("POST", "/job/save", appID, nil, job)
 	if err != nil {
 		return "", err
@@ -289,6 +298,35 @@ func (s *session) createJob(appID string, values map[string]any) (string, error)
 		return "", errors.New("PowerJob returned an unexpected saved job ID")
 	}
 	return jobID, nil
+}
+
+func (s *session) createJob(appID string, values map[string]any) (string, error) {
+	job := newJobPayload(appID)
+	if err := updateJobPayload(job, values); err != nil {
+		return "", err
+	}
+	return s.saveNewJob(appID, job)
+}
+
+func (s *session) copyJob(appID, jobID string, values map[string]any) (string, error) {
+	if err := validateJobChanges(values); err != nil {
+		return "", err
+	}
+	source, err := s.jobForAction(appID, jobID)
+	if err != nil {
+		return "", err
+	}
+	job := make(map[string]any, len(savableJobFields))
+	for field := range savableJobFields {
+		if value, ok := source[field]; ok {
+			job[field] = value
+		}
+	}
+	job["appId"] = json.Number(appID)
+	if err := updateJobPayload(job, values); err != nil {
+		return "", err
+	}
+	return s.saveNewJob(appID, job)
 }
 
 func (s *session) updateJob(appID, jobID string, changes map[string]any) error {
@@ -365,6 +403,24 @@ func (s *session) write(method string, params map[string]any) (any, error) {
 		result := map[string]any{"success": true}
 		if jobID != "" {
 			result["jobId"] = jobID
+		}
+		return result, nil
+	case "powerjob/copyJob":
+		jobID, err := requiredID(params, "jobId")
+		if err != nil {
+			return nil, err
+		}
+		values, ok := params["job"].(map[string]any)
+		if !ok {
+			return nil, errors.New("invalid job configuration")
+		}
+		copiedID, err := s.copyJob(appID, jobID, values)
+		if err != nil {
+			return nil, err
+		}
+		result := map[string]any{"success": true}
+		if copiedID != "" {
+			result["jobId"] = copiedID
 		}
 		return result, nil
 	case "powerjob/updateJob":
