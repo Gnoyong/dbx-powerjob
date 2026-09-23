@@ -32,6 +32,7 @@ type Tab = "detail" | "runs";
 type Filter = { type: InstanceType; instanceId: string; status: string };
 type Confirmation =
   | { kind: "jobEnabled"; job: Job; enabled: boolean }
+  | { kind: "deleteJob"; job: Job }
   | { kind: "retryInstance"; instance: Instance; jobId: string };
 const jobsPaneStorageKey = "local.powerjob.readonly.jobs-pane-width";
 const instancePollIntervalMs = 3000;
@@ -43,7 +44,7 @@ function actionErrorKey(error: unknown): TranslationKey | null {
   if (/rejected the request|denied access/i.test(message))
     return "powerJobDenied";
   if (
-    /already changed|exported job changed|only failed normal instances|job was not updated/i.test(
+    /already changed|exported job changed|only failed normal instances|job was not updated|job was not found/i.test(
       message,
     )
   )
@@ -614,6 +615,49 @@ export default function App() {
     }
   }
 
+  function requestDeleteJob(job: Job) {
+    if (!connectionId || !appId || actionPending.current) return;
+    setConfirmation({ kind: "deleteJob", job });
+  }
+
+  async function deleteJob(job: Job) {
+    if (!connectionId || !appId || actionPending.current) return;
+    actionPending.current = true;
+    const scope = currentScope.current;
+    setActionBusy(true);
+    setActionStatus("deletingJob");
+    setActionError(null);
+    try {
+      await invoke(connectionId, "powerjob/deleteJob", {
+        appId,
+        jobId: job.id,
+      });
+      if (currentScope.current === scope) {
+        setActionStatus("jobDeleted");
+        if (String(job.id) === selectedJobId) {
+          setSelectedJobId("");
+          setDetail(null);
+          setInstances(null);
+          setSelectedInstanceId("");
+          setModal(null);
+        }
+        if (jobs?.data.length === 1 && jobsIndex > 0) {
+          setJobsIndex((value) => Math.max(0, value - 1));
+        } else {
+          setRefresh((value) => value + 1);
+        }
+      }
+    } catch (error) {
+      if (currentScope.current === scope) {
+        setActionStatus("jobDeleteFailed");
+        setActionError(actionErrorKey(error));
+      }
+    } finally {
+      actionPending.current = false;
+      setActionBusy(false);
+    }
+  }
+
   async function runJob(instanceParams: string) {
     if (!connectionId || !appId || !runTarget || actionPending.current) return;
     const job = runTarget;
@@ -732,7 +776,7 @@ export default function App() {
         <div
           role="status"
           aria-live="polite"
-          className={`message ${actionStatus === "jobEnabled" || actionStatus === "jobDisabled" || actionStatus === "instanceRetried" || actionStatus === "jobRunRequested" || actionStatus === "jobUpdated" || actionStatus === "jobCreated" || actionStatus === "jobCopied" ? "success" : ""}`}
+          className={`message ${actionStatus === "jobEnabled" || actionStatus === "jobDisabled" || actionStatus === "jobDeleted" || actionStatus === "instanceRetried" || actionStatus === "jobRunRequested" || actionStatus === "jobUpdated" || actionStatus === "jobCreated" || actionStatus === "jobCopied" ? "success" : ""}`}
         >
           {t(actionStatus, { id: runInstanceId })}
           {actionError && ` ${t(actionError)}`}
@@ -778,6 +822,7 @@ export default function App() {
               onChooseJob={chooseJob}
               onCopyJob={startCopyingJob}
               onSetJobEnabled={requestSetJobEnabled}
+              onDeleteJob={requestDeleteJob}
               onRunJob={(job) => {
                 setRunError(null);
                 setRunTarget(job);
@@ -932,7 +977,9 @@ export default function App() {
           title={
             confirmation.kind === "jobEnabled"
               ? t(confirmation.enabled ? "enableJob" : "disableJob")
-              : t("retryFailed")
+              : confirmation.kind === "deleteJob"
+                ? t("deleteJob")
+                : t("retryFailed")
           }
           message={
             confirmation.kind === "jobEnabled"
@@ -945,21 +992,31 @@ export default function App() {
                     id: confirmation.job.id,
                   },
                 )
-              : t("confirmRetryFailed", {
-                  id: confirmation.instance.instanceId,
-                })
+              : confirmation.kind === "deleteJob"
+                ? t("confirmDeleteJob", {
+                    name: label(confirmation.job.jobName),
+                    id: confirmation.job.id,
+                  })
+                : t("confirmRetryFailed", {
+                    id: confirmation.instance.instanceId,
+                  })
           }
           confirmLabel={
             confirmation.kind === "jobEnabled"
               ? t(confirmation.enabled ? "enableJob" : "disableJob")
-              : t("retryFailed")
+              : confirmation.kind === "deleteJob"
+                ? t("deleteJob")
+                : t("retryFailed")
           }
+          destructive={confirmation.kind === "deleteJob"}
           busy={actionBusy}
           onConfirm={() => {
             const target = confirmation;
             setConfirmation(null);
             if (target.kind === "jobEnabled") {
               void setJobEnabled(target.job, target.enabled);
+            } else if (target.kind === "deleteJob") {
+              void deleteJob(target.job);
             } else {
               void retryFailedInstance(target.instance, target.jobId);
             }

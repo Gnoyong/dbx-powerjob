@@ -20,6 +20,7 @@ export function JobsPane({
   onChooseJob,
   onCopyJob,
   onSetJobEnabled,
+  onDeleteJob,
   onRunJob,
   busy,
   onPage,
@@ -35,6 +36,7 @@ export function JobsPane({
   onChooseJob: (job: Job) => void;
   onCopyJob: (job: Job) => void;
   onSetJobEnabled: (job: Job) => void;
+  onDeleteJob: (job: Job) => void;
   onRunJob: (job: Job) => void;
   busy: boolean;
   onPage: (index: number) => void;
@@ -244,7 +246,6 @@ export function JobsPane({
           </Button>
           <Button
             size="xs"
-
             type="button"
             variant="ghost"
             role="menuitem"
@@ -255,6 +256,20 @@ export function JobsPane({
             }}
           >
             {t(menu.job.enable ? "disableJob" : "enableJob")}
+          </Button>
+          <Button
+            size="xs"
+            type="button"
+            variant="ghost"
+            className="job-context-menu-delete"
+            role="menuitem"
+            disabled={busy}
+            onClick={() => {
+              setMenu(null);
+              onDeleteJob(menu.job);
+            }}
+          >
+            {t("deleteJob")}
           </Button>
         </div>
       )}

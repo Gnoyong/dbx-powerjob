@@ -6,6 +6,7 @@ export function ConfirmActionDialog({
   title,
   message,
   confirmLabel,
+  destructive = false,
   busy,
   onConfirm,
   onClose,
@@ -14,6 +15,7 @@ export function ConfirmActionDialog({
   title: string;
   message: string;
   confirmLabel: string;
+  destructive?: boolean;
   busy: boolean;
   onConfirm: () => void;
   onClose: () => void;
@@ -54,6 +56,7 @@ export function ConfirmActionDialog({
           <Button
             size="xs"
             type="button"
+            className={destructive ? "confirm-action-destructive" : undefined}
             disabled={busy}
             onClick={onConfirm}
           >

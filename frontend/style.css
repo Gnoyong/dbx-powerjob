@@ -983,6 +983,10 @@ input[data-slot="input"][aria-invalid="true"] {
   font-size: 12px;
 }
 
+.job-context-menu button.job-context-menu-delete {
+  color: var(--color-destructive, #a3312a);
+}
+
 .confirm-action-dialog {
   width: min(420px, calc(100vw - 24px));
   display: flex;
@@ -993,6 +997,12 @@ input[data-slot="input"][aria-invalid="true"] {
 
 .confirm-action-dialog p {
   margin: 0;
+}
+
+.confirm-action-dialog .confirm-action-destructive {
+  border-color: transparent;
+  background: var(--color-destructive, #a3312a);
+  color: var(--color-destructive-foreground, #fff);
 }
 
 .create-job-dialog {

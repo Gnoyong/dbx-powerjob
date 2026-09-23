@@ -459,6 +459,22 @@ func (s *session) write(method string, params map[string]any) (any, error) {
 			return nil, errors.New("PowerJob returned an unexpected instance ID")
 		}
 		return map[string]any{"instanceId": asString(instanceID)}, nil
+	case "powerjob/deleteJob":
+		jobID, err := requiredID(params, "jobId")
+		if err != nil {
+			return nil, err
+		}
+		// Re-read the job immediately before the destructive request so a stale
+		// UI row cannot delete a job from another application.
+		if _, err := s.jobForAction(appID, jobID); err != nil {
+			return nil, err
+		}
+		if _, err := s.request("GET", "/job/delete", appID, url.Values{
+			"jobId": {jobID},
+		}, nil); err != nil {
+			return nil, err
+		}
+		return map[string]any{"success": true}, nil
 	case "powerjob/setJobEnabled":
 		jobID, err := requiredID(params, "jobId")
 		if err != nil {

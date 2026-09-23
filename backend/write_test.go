@@ -418,6 +418,58 @@ func TestDisableRejectsSuccessWithoutStateChange(t *testing.T) {
 	}
 }
 
+func TestDeleteJobUsesScopedRoute(t *testing.T) {
+	var calls []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls = append(calls, r.Method+" "+r.URL.Path)
+		if r.Header.Get("AppId") != "4" || r.Header.Get("PowerJwt") != "token" {
+			t.Error("missing scoped authorization headers")
+		}
+		switch r.URL.Path {
+		case "/job/list":
+			fmt.Fprint(w, `{"success":true,"data":{"data":[{"id":147,"appId":4,"enable":false,"jobName":"demo"}]}}`)
+		case "/job/delete":
+			if r.Method != "GET" || r.URL.Query().Get("jobId") != "147" {
+				t.Errorf("unexpected delete request: %s %s", r.Method, r.URL.String())
+			}
+			fmt.Fprint(w, `{"success":true,"data":null}`)
+		default:
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	s := &session{baseURL: server.URL, client: server.Client(), jwt: "token"}
+	result, err := s.write("powerjob/deleteJob", map[string]any{"appId": "4", "jobId": "147"})
+	if err != nil || result.(map[string]any)["success"] != true {
+		t.Fatalf("unexpected delete result: %#v, %v", result, err)
+	}
+	if !reflect.DeepEqual(calls, []string{"POST /job/list", "GET /job/delete"}) {
+		t.Fatal(calls)
+	}
+}
+
+func TestDeleteJobRejectsWrongApplicationAndReadOnly(t *testing.T) {
+	var deleteCalls int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/job/delete" {
+			deleteCalls++
+		}
+		fmt.Fprint(w, `{"success":true,"data":{"data":[{"id":147,"appId":5,"enable":true}]}}`)
+	}))
+	defer server.Close()
+
+	s := &session{baseURL: server.URL, client: server.Client()}
+	params := map[string]any{"appId": "4", "jobId": "147"}
+	if _, err := s.write("powerjob/deleteJob", params); err == nil || deleteCalls != 0 {
+		t.Fatalf("wrong-app job was deleted: %v", err)
+	}
+	s.readOnly = true
+	if _, err := s.write("powerjob/deleteJob", params); err == nil || deleteCalls != 0 {
+		t.Fatalf("read-only job was deleted: %v", err)
+	}
+}
+
 func TestEnableAcceptsNullSaveResultWhenStateChanged(t *testing.T) {
 	enabled := false
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -495,6 +547,7 @@ func TestWriteRejectsInvalidInputBeforeRequest(t *testing.T) {
 		{"powerjob/runJob", map[string]any{"appId": "2", "jobId": "bad", "instanceParams": "test"}},
 		{"powerjob/runJob", map[string]any{"appId": "2", "jobId": "7", "instanceParams": 123}},
 		{"powerjob/runJob", map[string]any{"appId": "2", "jobId": "7", "instanceParams": string(make([]byte, 4097))}},
+		{"powerjob/deleteJob", map[string]any{"appId": "2", "jobId": "../../delete"}},
 		{"powerjob/delete", map[string]any{"appId": "2"}},
 	} {
 		if _, err := s.write(tc.method, tc.params); err == nil {
