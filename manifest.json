@@ -3,7 +3,7 @@
   "manifest_version": 1,
   "id": "local.powerjob.readonly",
   "name": "PowerJob Workbench",
-  "version": "0.1.17",
+  "version": "0.1.18",
   "publisher": "local",
   "description": "Create, browse, and edit PowerJob jobs; inspect instances, run and toggle jobs, and retry failed normal instances.",
   "icon": "assets/plugin.svg",
