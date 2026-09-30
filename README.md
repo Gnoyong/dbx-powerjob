@@ -1,92 +1,116 @@
-# DBX PowerJob 工作台插件
+<div align="center">
+  <img src="assets/plugin.svg" alt="PowerJob 工作台图标" width="72" height="72" />
 
-基于 [DBX 插件开发规范](https://dbxio.com/en/docs/plugin-development) 的 Go sidecar + React/TypeScript 工作台插件。使用 PowerJob 控制台 Web API，不调用 `/openApi`。支持新建、复制和编辑任务配置、立即运行、启用/停用任务及重跑失败普通实例；其他功能只读。
+# DBX PowerJob 工作台
+
+在 DBX 中管理 PowerJob 任务、查看执行实例与日志。
+
+[使用](#使用) · [开发](#开发) · [打包与发布](#打包与发布)
+
+</div>
+
+基于 **React / TypeScript + Go sidecar**，通过 PowerJob 控制台 Web API 接入，不调用 `/openApi`。
 
 ## 功能
 
-| 工作台功能 | PowerJob Web API | HTTP 方法 |
-| --- | --- | --- |
-| 应用列表 | `/appInfo/list` | POST |
-| 任务列表和详情 | `/job/list` | POST |
-| 执行实例列表 | `/instance/list` | POST |
-| 实例详情 | `/instance/detailPlus` | POST |
-| 实例日志 | `/instance/log` | GET |
-| 立即运行任务 | `/job/run?jobId=…&appId=…&instanceParams=…` | GET |
-| 停用任务 | `/job/disable` | GET |
-| 启用任务 | `/job/list` → `/job/save`（保持任务完整配置，仅将 `enable` 改为 `true`） | POST → POST |
-| 新建任务 | `/job/save` | POST |
-| 复制任务 | `/job/list` → `/job/save`（读取原任务完整配置，在创建对话框中编辑后以新任务保存） | POST → POST |
-| 修改任务 | `/job/list` → `/job/save`（仅合并允许编辑的配置字段，并保存后复查） | POST → POST |
-| 重跑失败普通实例 | `/instance/retry?instanceId=…&appId=…` | GET |
-
-登录使用 `/auth/thirdPartyLoginDirect`，并通过 `/auth/ifLogin` 验证会话。sidecar 只暴露表中列出的 RPC 方法，HTTP 路径在代码中固定；运行及启停前重新查询目标的应用归属，启停还会确认当前状态并在接口成功后再次验证，失败实例仅支持普通任务。修改任务时仅接收允许的配置字段，重新获取完整配置、保存并复查。操作需要账号相应的 PowerJob WRITE/OPS 权限，界面会确认并显示结果。应用列表响应会过滤掉 `password` 等未展示字段。任务和实例 ID 以字符串传递，避免浏览器处理大整数时丢失精度。
+- **任务**：搜索、新建、复制、编辑、删除、运行和启停。
+- **实例与日志**：实例筛选、失败普通实例重跑、日志跟随与导出。
+- **工作台**：应用切换、中英文与主题适配、可调整面板布局。
 
 ## 使用
 
-连接的默认主机是 `powerjob.prod.oceanwear.online`，端口为 `443`。在 DBX 中创建 PowerJob 连接，填写用户名、密码并测试连接，再从该连接打开「PowerJob 总览」。顶部切换应用；左栏任务用绿色“启用”和红色“停用”文本展示当前状态。右键任务可通过菜单运行、复制、启用或停用（键盘可用 Shift+F10 或菜单键）；复制会打开预填原任务配置的创建对话框，并将名称默认追加 `(1)`，提交前仍可编辑。启停前会弹出确认。运行弹窗可填写实例参数，留空也会发送空参数；成功后显示实例 ID 并打开「实例与日志」。右栏的「任务详情」可直接修改配置：生命周期通过日期范围日历选择日期并分别设置时间，以毫秒时间戳提交；告警、日志和高级运行配置使用对应的数值及选项控件，启用状态使用开关。发生改动后详情顶部出现保存按钮，也可用重置按钮撤销未保存的改动。停用仍调用 `/job/disable`。创建和修改时间以本地时间展示。「实例与日志」在上方展示该任务的实例，可按实例 ID、类型和状态筛选；该页签打开期间每 3 秒自动更新当前页，请求未完成时跳过本次轮询，在下方按滚动位置自动加载选中实例的日志，也可将导出开始时已有的全部日志分页读取并保存为 `.log` 文件。失败的普通任务实例可在表格中确认后重跑；实例表格也保留独立的实例详情入口。停用高频任务可能同时停止正在运行的实例；运行或重跑可能重复产生业务效果。
+在 DBX「插件中心」导入 `.dbxp`，创建「PowerJob 连接」，填写主机、HTTPS 端口和账号，连接后打开「PowerJob 总览」。
 
-在 DBX 侧边栏右键已连接的 PowerJob 连接，可点「查看应用」。插件读取第一页最多 8 个应用名称，由 DBX 以提示消息显示；应用更多时提示总数，完整列表仍在「PowerJob 总览」中查看。DBX 的 `context-menu` 是静态菜单项，不支持把应用动态展开为子菜单。未连接时会提示先连接。
+- 主机不含协议、端口或路径；端口默认 `443`。
+- 只读连接禁止写操作；更改只读设置后需重新连接。写操作需要 PowerJob 对应的 WRITE / OPS 权限。
+- 「跳过 TLS 证书校验」默认关闭，仅供可信自签名环境使用。
 
-新建 DBX 连接默认可写。若沿用旧的「只读连接」，请在连接设置中取消勾选并重新连接；只读连接不会执行运行、启停或重跑。开发宿主已保存的连接若从文件修改了该设置，需要重启开发宿主后重新连接。
+> [!IMPORTANT]
+> 本地和仓库工作流生成的是未签名候选包。本机验证需开启 **Allow unsigned development packages**；正式分发需经 DBX Store 审核签名。
 
-拖动任务栏与详情栏之间的分隔线可调整栏宽；聚焦分隔线后也可使用左右方向键微调，Home/End 调至边界。宿主允许本地存储时，刷新后会保留栏宽。
+任务操作位于右键菜单，配置编辑位于「任务详情」。运行中的实例可导出当前日志。停用高频任务可能同时停止正在执行的实例。
 
-任务搜索支持点击 Search 或按回车提交。提交会回到第 1 页；翻页和刷新沿用最近一次提交的关键词，输入框中未提交的修改不会改变当前结果。
+插件 ID `local.powerjob.readonly` 是保留的开发标识，当前已支持写操作。
 
-工作台支持中文和英文，跟随 DBX 当前语言自动切换；切换时保留已选任务、实例和已加载日志。Manifest 中的连接表单与工作台入口使用 DBX 的本地化字段，工作台内部使用随包提供的词典。
+## 开发
 
-实例列表与详情中的状态数字按当前实例类型显示为中英文文字。普通任务与工作流的状态码分别依据 PowerJob 的 [InstanceStatus](https://github.com/PowerJob/PowerJob/blob/master/powerjob-common/src/main/java/tech/powerjob/common/enums/InstanceStatus.java) 和 [WorkflowInstanceStatus](https://github.com/PowerJob/PowerJob/blob/master/powerjob-common/src/main/java/tech/powerjob/common/enums/WorkflowInstanceStatus.java)；未知状态码保留原值。
-
-该实例目前使用无法通过标准校验的 TLS 证书。连接表单中的「跳过 TLS 证书校验」必须由使用者显式启用，默认关闭。启用后通信仍使用 HTTPS，但客户端无法确认服务器身份；应仅在可信网络中使用。修复服务器证书后请关闭该选项。
-
-PowerJob Web API 不是稳定公开契约。升级 PowerJob 后应重新验证登录响应、请求参数和返回字段。连接使用账号自身的权限；插件不会提升权限。
-
-## 安装与签名
-
-`dist/` 中的 `.dbxp` 是**未签名的审核候选包**。DBX 默认安装时会报 `Plugin package must have a trusted Ed25519 signature`，这是预期行为；该文件不能作为正式安装包分发。
-
-- **仅用于本机开发验证**：在 DBX「插件中心」显式启用 **Allow unsigned development packages**，再导入本地 `.dbxp`。只对确认来源的本地候选包使用，测试后关闭该选项。此设置不会改变官方 Marketplace 的签名验证。
-- **正式发布**：先确定稳定的插件 ID 和 publisher（当前 `local.powerjob.readonly` / `local` 是开发阶段占位值），把源码放入插件自己的 GitHub 仓库，创建版本标签和 Release。现有 `.github/workflows/plugin-release.yml` 会为支持的平台构建未签名候选包与 `release-candidates.json`。按 [DBX 官方发布流程](https://dbxio.com/en/docs/plugin-development#complete-official-marketplace-flow) 向 `t8y2/dbx-store` 提交候选信息；维护者审核后由受保护的 DBX Store 工作流签名，再下载签名后的包安装。插件作者不能自行获得官方私钥，也不能通过修改 Manifest 使当前候选包变成可信包。
-
-Gitea 仓库推送 `v*` 版本标签后，`.gitea/workflows/plugin-release.yml` 会校验标签与 `package.json`、`manifest.json` 的版本一致，构建候选包，并替换滚动的 `latest` Release。触发构建的版本 Git 标签会保留；Gitea Release 只使用 `latest` 标签。
-
-在 VS Code 中运行任务“发布新版本”可完成版本更新、提交、创建版本标签并原子推送。版本输入框默认显示当前版本的下一补丁版本；任务成功准备版本文件后会同步推进下次默认值。发版前工作区必须无未提交改动。
-
-当前仓库没有经过 DBX Store 签名的正式包，因此正式签名流程尚未完成。
-
-## 开发与验证
-
-使用 Node.js 22+、pnpm 11、Go 1.22+。`frontend/` 保存 React/TypeScript 源码，`ui/` 是 Vite 生成的静态文件，Manifest 仍以 `ui/index.html` 为入口。Vite 使用相对资源路径，运行时不依赖开发服务器或 CDN。
-
-前端使用 shadcn/ui 的项目内组件结构，配置见 `components.json`，基础控件在 `frontend/components/ui/`。控件沿用 `frontend/style.css` 的现有尺寸、颜色和布局；Tailwind 只加载主题与工具类，不加载会重置页面元素的 Preflight。
+环境：**Node.js 22+、pnpm 11.9.0、Go 1.22+**。在 `powerjob-plugin/` 中执行：
 
 ```powershell
 pnpm install --frozen-lockfile
-pnpm run build
-```
-
-官方 CLI 的开发模式会调用 `dbx-plugin.toml` 中的 `ui_build` / `ui_watch`；正式候选包也应先构建前端：
-
-```powershell
 pnpm run dev
-pnpm run build
-pnpm dlx @dbx-app/plugin-cli package .
 ```
 
-`pnpm run dev` 使用项目内的 DBX 插件 CLI 启动浏览器开发宿主，并将 Go 构建缓存放在已忽略的 `backend/.go-cache/`。开发宿主默认使用 5190 端口，若被占用会选择空闲端口。
-`ui_watch` 只热更新前端。修改 `backend/` 中的 RPC 方法后，需要重启开发宿主；已安装的 DBX 插件还需要重新打包并安装新版本，否则前端可能报 `Method not found`。
+开发端口为 **15190**，Go 缓存位于 `backend/.go-cache/`。前端自动重新构建；修改 Go RPC 后需重启开发宿主。
 
-`pnpm run typecheck` 可以单独检查 TypeScript。Release 工作流会先安装锁定依赖、构建前端，再调用 DBX 打包命令；该流程生成的候选包仍未签名。
+> [!CAUTION]
+> 开发连接凭据明文保存在已忽略的 `.dbx-dev/`，使用后应清理。
 
-调试器会把开发连接凭据明文保存在 `.dbx-dev/`，该目录已忽略，使用后应删除。仓库文件不包含实例密码。
-
-核心接口测试可以运行：
+### 检查与构建
 
 ```powershell
-Set-Location backend
-$env:GOCACHE = Join-Path (Get-Location) '.go-cache'
-$env:GO111MODULE = 'off'
-go test client.go read.go write.go read_test.go write_test.go
+pnpm run build
+git diff --check
 ```
 
-测试覆盖路径白名单、应用敏感字段过滤、JWT 请求头、大整数实例 ID、写入前目标校验和请求参数校验。此命令只测试不依赖 SDK 的 Go 文件；完整 sidecar 构建由官方 CLI 使用其随包 SDK 验证。测试不会连接生产 PowerJob 或执行实际写入。
+`build` 包含 TypeScript 检查，输出前端资源到 `ui/`；单独类型检查可用 `pnpm run typecheck`。DBX 沙箱交互规范见 [AGENTS.md](AGENTS.md)。
+
+核心接口测试（不依赖 DBX SDK，使用本地模拟服务）：
+
+```powershell
+Push-Location backend
+try {
+    $env:GOCACHE = Join-Path (Get-Location) '.go-cache'
+    go test client.go read.go write.go read_test.go write_test.go
+} finally {
+    Pop-Location
+}
+```
+
+完整 sidecar 由 DBX 插件 CLI 使用随包 SDK 构建。
+
+### 目录
+
+| 路径 | 内容 |
+| --- | --- |
+| `backend/` | Go sidecar、会话、接口及测试 |
+| `frontend/` | React 工作台、组件与词典 |
+| `scripts/` | 开发、构建和发布脚本 |
+| `manifest.json` | 插件身份、连接字段与入口 |
+| `dbx-plugin.toml` | 构建和打包配置 |
+| `ui/` / `dist/` | 生成的前端资源 / 候选包，不入库 |
+
+## 打包与发布
+
+### 本地打包
+
+```powershell
+pnpm run build
+$env:GOCACHE = Join-Path (Get-Location) 'backend/.go-cache'
+node node_modules/@dbx-app/plugin-cli/bin/dbx-plugin.js package .
+```
+
+输出位于 `dist/`，也可运行 VS Code 默认构建任务「打包 DBX 插件」。
+
+### 仓库发布
+
+| 平台 | 触发方式 | 产物 |
+| --- | --- | --- |
+| Gitea | 推送 `v*` 标签 | Windows 候选包，更新滚动的 `latest` Release，保留版本标签 |
+| GitHub | 发布 Release 或手动指定 Release 标签 | Linux、Windows、macOS 的 x64 / arm64 候选包及元数据 |
+
+标签版本必须与 `package.json`、`manifest.json` 一致。Gitea 需要 Windows runner 和发布令牌。
+
+VS Code「发布新版本」任务要求干净工作区及递增的 `x.y.z` 版本号，会更新版本、提交、创建标签并原子推送到 `origin`。
+
+正式发布前需确定稳定的插件 ID 和 publisher，并按 [DBX 官方发布流程](https://dbxio.com/en/docs/plugin-development#complete-official-marketplace-flow)提交候选包审核签名。
+
+## 兼容性与排错
+
+PowerJob 控制台 Web API 不是稳定公开契约，升级后需验证登录和接口兼容性。
+
+| 问题 | 处理 |
+| --- | --- |
+| `Method not found: powerjob/...` | 重启开发宿主；已安装插件需重新打包并安装递增版本 |
+| 写操作提示只读 | 修改连接设置并重新连接；直接修改开发连接文件后需重启宿主 |
+| `allow-forms` / `allow-modals` | 按 [AGENTS.md](AGENTS.md)检查原生表单提交和弹窗 |
