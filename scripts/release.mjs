@@ -7,6 +7,7 @@ const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const packagePath = resolve(projectRoot, "package.json");
 const manifestPath = resolve(projectRoot, "manifest.json");
 const tasksPath = resolve(projectRoot, ".vscode", "tasks.json");
+const backendPath = resolve(projectRoot, "backend", "main.go");
 
 function parseVersion(value, label) {
   const normalized = value.trim().replace(/^v/, "");
@@ -59,10 +60,11 @@ async function main() {
   const requestedVersion = process.argv[2];
   if (!requestedVersion) throw new Error("A release version is required.");
 
-  const [packageSource, manifestSource, tasksSource] = await Promise.all([
+  const [packageSource, manifestSource, tasksSource, backendSource] = await Promise.all([
     readFile(packagePath, "utf8"),
     readFile(manifestPath, "utf8"),
     readFile(tasksPath, "utf8"),
+    readFile(backendPath, "utf8"),
   ]);
   const packageJson = JSON.parse(packageSource);
   const manifestJson = JSON.parse(manifestSource);
@@ -101,6 +103,15 @@ async function main() {
   if (!releaseInput) throw new Error("VS Code releaseVersion input is missing.");
   releaseInput.default = nextPatch(newVersion);
 
+  const backendVersionPattern = /^(\s*Version:\s*)"[^"]*"(\s*,)/gm;
+  if ([...backendSource.matchAll(backendVersionPattern)].length !== 1) {
+    throw new Error("Unable to update the plugin version in backend/main.go.");
+  }
+  const updatedBackendSource = backendSource.replace(
+    backendVersionPattern,
+    (_, prefix, suffix) => `${prefix}"${newVersion.value}"${suffix}`,
+  );
+
   await Promise.all([
     writeFile(
       packagePath,
@@ -111,9 +122,10 @@ async function main() {
       replaceTopLevelVersion(manifestSource, currentVersion.value, newVersion.value, "manifest.json"),
     ),
     writeFile(tasksPath, `${JSON.stringify(tasksJson, null, 2)}\n`),
+    writeFile(backendPath, updatedBackendSource),
   ]);
 
-  runGit(["add", "package.json", "manifest.json", ".vscode/tasks.json"]);
+  runGit(["add", "package.json", "manifest.json", ".vscode/tasks.json", "backend/main.go"]);
   runGit(["commit", "-m", `chore: bump plugin version to ${newVersion.value}`]);
   runGit(["tag", "-a", tag, "-m", `Release ${tag}`]);
 
