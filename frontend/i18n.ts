@@ -1,5 +1,7 @@
 export const dictionaries = {
   en: {
+    layoutStorageFailed: "Could not restore or save the panel layout. Please retry.",
+    notifications: "Notifications",
     title: "PowerJob Workbench", app: "Application", previousApp: "Previous application", nextApp: "Next application",
     readonly: "Job control", refresh: "Refresh", jobList: "Job list", resizeJobsPane: "Resize job list", resizeLogsPane: "Resize log viewer height", jobs: "Jobs", jobKeyword: "Job keyword",
     enableJob: "Enable job", disableJob: "Disable job", deleteJob: "Delete job", runJob: "Run job", copyJob: "Copy job", retryFailed: "Retry",
@@ -62,6 +64,8 @@ export const dictionaries = {
     gmtCreate: "Created at", gmtModified: "Modified at",
   },
   "zh-CN": {
+    layoutStorageFailed: "面板布局读取或保存失败，请重试。",
+    notifications: "通知",
     title: "PowerJob 工作台", app: "应用", previousApp: "上一个应用", nextApp: "下一个应用",
     readonly: "任务操作", refresh: "刷新", jobList: "任务列表", resizeJobsPane: "调整任务栏宽度", resizeLogsPane: "调整日志区域高度", jobs: "任务", jobKeyword: "任务关键字",
     enableJob: "启用任务", disableJob: "停用任务", deleteJob: "删除任务", runJob: "运行任务", copyJob: "复制任务", retryFailed: "重试",

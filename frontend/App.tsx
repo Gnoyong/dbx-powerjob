@@ -2,6 +2,10 @@ import { Button } from "./components/ui/button";
 import { useEffect, useRef, useState } from "react";
 import { label } from "./format";
 import { getHost, invoke } from "./host";
+import { toast } from "sonner";
+import { notifyAction } from "./notifications";
+import type { ActionNotificationKey } from "./notifications";
+import { useStorageToast } from "./hooks/useStorageToast";
 import { normalizeLocale, translate } from "./i18n";
 import type { Locale, TranslationKey } from "./i18n";
 import type {
@@ -21,7 +25,7 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "./components/ui/resizable";
-import type { PanelSize } from "react-resizable-panels";
+import { useStoredPanelSize } from "./hooks/useStoredPanelSize";
 import { JobInspector } from "./components/JobInspector";
 import { InstanceDialog } from "./components/InstanceDialog";
 import { RunJobDialog } from "./components/RunJobDialog";
@@ -96,23 +100,16 @@ export default function App() {
   } | null>(null);
   const [editError, setEditError] = useState<TranslationKey | null>(null);
   const [runError, setRunError] = useState<TranslationKey | null>(null);
-  const [runInstanceId, setRunInstanceId] = useState("");
   const [refresh, setRefresh] = useState(0);
   const [instancesRefresh, setInstancesRefresh] = useState(0);
-  const [actionStatus, setActionStatus] = useState<TranslationKey | null>(null);
-  const [actionError, setActionError] = useState<TranslationKey | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
   const actionPending = useRef(false);
-  const [savedJobsWidth] = useState(() => {
-    try {
-      const raw = localStorage.getItem(jobsPaneStorageKey);
-      const value = raw === null ? NaN : Number(raw);
-      return Number.isFinite(value) && value >= 240 ? value : null;
-    } catch {
-      return null;
-    }
-  });
-  const jobsWidth = useRef(savedJobsWidth ?? 0);
+  const jobsLayout = useStoredPanelSize(jobsPaneStorageKey, 240);
+  useStorageToast("jobs-layout", jobsLayout.failed, jobsLayout.retry, t);
+  function showAction(key: ActionNotificationKey | null, detail?: TranslationKey | null, vars?: Record<string, string | number>) {
+    notifyAction(t, key, detail, vars);
+  }
+  useEffect(() => () => { toast.dismiss("powerjob-action"); }, []);
   const currentScope = useRef("");
   currentScope.current = `${connectionId}:${appId}`;
   const [appsRefresh, setAppsRefresh] = useState(0);
@@ -180,8 +177,7 @@ export default function App() {
     setInstances(null);
     setSelectedInstanceId("");
     setModal(null);
-    setActionStatus(null);
-    setActionError(null);
+    showAction(null);
   }, [connectionId]);
 
   useEffect(() => {
@@ -228,8 +224,7 @@ export default function App() {
     setInstances(null);
     setSelectedInstanceId("");
     setModal(null);
-    setActionStatus(null);
-    setActionError(null);
+    showAction(null);
   }, [appId]);
 
   useEffect(() => {
@@ -427,8 +422,7 @@ export default function App() {
     actionPending.current = true;
     const scope = currentScope.current;
     setActionBusy(true);
-    setActionStatus("savingJob");
-    setActionError(null);
+    showAction("savingJob");
     setEditError(null);
     try {
       await invoke(connectionId, "powerjob/updateJob", {
@@ -437,14 +431,13 @@ export default function App() {
         changes,
       });
       if (currentScope.current === scope) {
-        setActionStatus("jobUpdated");
+        showAction("jobUpdated");
         setRefresh((value) => value + 1);
       }
     } catch (error) {
       if (currentScope.current === scope) {
-        setActionStatus("jobUpdateFailed");
         const key = actionErrorKey(error);
-        setActionError(key);
+        showAction("jobUpdateFailed", key);
         setEditError(key);
       }
     } finally {
@@ -458,21 +451,19 @@ export default function App() {
     actionPending.current = true;
     const scope = currentScope.current;
     setActionBusy(true);
-    setActionStatus("creatingJob");
-    setActionError(null);
+    showAction("creatingJob");
     setEditError(null);
     try {
       await invoke(connectionId, "powerjob/createJob", { appId, job });
       if (currentScope.current === scope) {
         setCreating(false);
-        setActionStatus("jobCreated");
+        showAction("jobCreated");
         setRefresh((value) => value + 1);
       }
     } catch (error) {
       if (currentScope.current === scope) {
-        setActionStatus("jobCreateFailed");
         const key = actionErrorKey(error);
-        setActionError(key);
+        showAction("jobCreateFailed", key);
         setEditError(key);
       }
     } finally {
@@ -482,13 +473,11 @@ export default function App() {
   }
 
   async function copyJob(job: Record<string, unknown>) {
-    if (!connectionId || !appId || !copySource || actionPending.current)
-      return;
+    if (!connectionId || !appId || !copySource || actionPending.current) return;
     actionPending.current = true;
     const scope = currentScope.current;
     setActionBusy(true);
-    setActionStatus("creatingJob");
-    setActionError(null);
+    showAction("creatingJob");
     setEditError(null);
     try {
       await invoke(connectionId, "powerjob/copyJob", {
@@ -498,14 +487,13 @@ export default function App() {
       });
       if (currentScope.current === scope) {
         setCopySource(null);
-        setActionStatus("jobCopied");
+        showAction("jobCopied");
         setRefresh((value) => value + 1);
       }
     } catch (error) {
       if (currentScope.current === scope) {
-        setActionStatus("jobCopyFailed");
         const key = actionErrorKey(error);
-        setActionError(key);
+        showAction("jobCopyFailed", key);
         setEditError(key ?? "jobCopyFailed");
       }
     } finally {
@@ -519,8 +507,7 @@ export default function App() {
     actionPending.current = true;
     const scope = currentScope.current;
     setActionBusy(true);
-    setActionStatus("loadingJobCopy");
-    setActionError(null);
+    showAction("loadingJobCopy");
     setEditError(null);
     setCreating(false);
     setCopySource(null);
@@ -534,10 +521,10 @@ export default function App() {
           jobId: String(job.id),
           detail: { ...value, jobName: value.jobName ?? job.jobName ?? "" },
         });
-        setActionStatus(null);
+        showAction(null);
       }
     } catch {
-      if (currentScope.current === scope) setActionStatus("jobCopyLoadFailed");
+      if (currentScope.current === scope) showAction("jobCopyLoadFailed");
     } finally {
       actionPending.current = false;
       setActionBusy(false);
@@ -549,8 +536,7 @@ export default function App() {
     setCopySource(null);
     setCreating(true);
     setEditError(null);
-    setActionStatus(null);
-    setActionError(null);
+    showAction(null);
   }
   function chooseInstance(instance: Instance) {
     setSelectedInstanceId(String(instance.instanceId));
@@ -581,8 +567,7 @@ export default function App() {
     actionPending.current = true;
     const scope = currentScope.current;
     setActionBusy(true);
-    setActionStatus("savingJob");
-    setActionError(null);
+    showAction("savingJob");
     try {
       await invoke(connectionId, "powerjob/setJobEnabled", {
         appId,
@@ -590,7 +575,7 @@ export default function App() {
         enabled,
       });
       if (currentScope.current === scope) {
-        setActionStatus(enabled ? "jobEnabled" : "jobDisabled");
+        showAction(enabled ? "jobEnabled" : "jobDisabled");
         setJobs((previous) => {
           if (!previous) return previous;
           const index = previous.data.findIndex(
@@ -606,8 +591,7 @@ export default function App() {
       }
     } catch (error) {
       if (currentScope.current === scope) {
-        setActionStatus("jobActionFailed");
-        setActionError(actionErrorKey(error));
+        showAction("jobActionFailed", actionErrorKey(error));
       }
     } finally {
       actionPending.current = false;
@@ -625,15 +609,14 @@ export default function App() {
     actionPending.current = true;
     const scope = currentScope.current;
     setActionBusy(true);
-    setActionStatus("deletingJob");
-    setActionError(null);
+    showAction("deletingJob");
     try {
       await invoke(connectionId, "powerjob/deleteJob", {
         appId,
         jobId: job.id,
       });
       if (currentScope.current === scope) {
-        setActionStatus("jobDeleted");
+        showAction("jobDeleted");
         if (String(job.id) === selectedJobId) {
           setSelectedJobId("");
           setDetail(null);
@@ -649,8 +632,7 @@ export default function App() {
       }
     } catch (error) {
       if (currentScope.current === scope) {
-        setActionStatus("jobDeleteFailed");
-        setActionError(actionErrorKey(error));
+        showAction("jobDeleteFailed", actionErrorKey(error));
       }
     } finally {
       actionPending.current = false;
@@ -665,8 +647,7 @@ export default function App() {
     actionPending.current = true;
     setActionBusy(true);
     setRunError(null);
-    setActionStatus("runningJob");
-    setActionError(null);
+    showAction("runningJob");
     try {
       const result = await invoke(connectionId, "powerjob/runJob", {
         appId,
@@ -674,8 +655,7 @@ export default function App() {
         instanceParams,
       });
       if (currentScope.current === scope) {
-        setRunInstanceId(result.instanceId);
-        setActionStatus("jobRunRequested");
+        showAction("jobRunRequested", null, { id: result.instanceId });
         setRunTarget(null);
         setSelectedJobId(String(job.id));
         setInstanceIndex(0);
@@ -691,8 +671,7 @@ export default function App() {
       if (currentScope.current === scope) {
         const key = actionErrorKey(error) ?? "runJobFailed";
         setRunError(key);
-        setActionStatus("runJobFailed");
-        setActionError(actionErrorKey(error));
+        showAction("runJobFailed", actionErrorKey(error));
       }
     } finally {
       actionPending.current = false;
@@ -717,8 +696,7 @@ export default function App() {
     actionPending.current = true;
     const scope = currentScope.current;
     setActionBusy(true);
-    setActionStatus("retryingInstance");
-    setActionError(null);
+    showAction("retryingInstance");
     try {
       await invoke(connectionId, "powerjob/retryFailedInstance", {
         appId,
@@ -726,14 +704,13 @@ export default function App() {
         instanceId: instance.instanceId,
       });
       if (currentScope.current === scope) {
-        setActionStatus("instanceRetried");
+        showAction("instanceRetried");
         setModal(null);
         setInstancesRefresh((value) => value + 1);
       }
     } catch (error) {
       if (currentScope.current === scope) {
-        setActionStatus("retryFailedMessage");
-        setActionError(actionErrorKey(error));
+        showAction("retryFailedMessage", actionErrorKey(error));
       }
     } finally {
       actionPending.current = false;
@@ -772,164 +749,149 @@ export default function App() {
           {t(message)}
         </div>
       )}
-      {actionStatus && (
-        <div
-          role="status"
-          aria-live="polite"
-          className={`message ${actionStatus === "jobEnabled" || actionStatus === "jobDisabled" || actionStatus === "jobDeleted" || actionStatus === "instanceRetried" || actionStatus === "jobRunRequested" || actionStatus === "jobUpdated" || actionStatus === "jobCreated" || actionStatus === "jobCopied" ? "success" : ""}`}
-        >
-          {t(actionStatus, { id: runInstanceId })}
-          {actionError && ` ${t(actionError)}`}
-        </div>
-      )}
+
+
       <main className="workspace">
-        <ResizablePanelGroup
-          id="workspace-panel-group"
-          className="workspace-panel-group"
-          orientation="horizontal"
-          onLayoutChanged={(_layout, meta) => {
-            if (!meta.isUserInteraction || jobsWidth.current <= 0) return;
-            try {
-              localStorage.setItem(
-                jobsPaneStorageKey,
-                String(Math.round(jobsWidth.current)),
-              );
-            } catch {
-              /* sandboxed host */
-            }
-          }}
-        >
-          <ResizablePanel
-            id="jobs-panel"
-            className="workspace-panel"
-            minSize={240}
-            defaultSize={
-              savedJobsWidth ?? (window.innerWidth <= 800 ? "36%" : "30%")
-            }
-            groupResizeBehavior="preserve-pixel-size"
-            onResize={(size: PanelSize) => {
-              jobsWidth.current = size.inPixels;
-            }}
+        {!jobsLayout.ready ? (
+          <div role="status">{t("loading")}</div>
+        ) : (
+          <ResizablePanelGroup
+            id="workspace-panel-group"
+            className="workspace-panel-group"
+            orientation="horizontal"
+            onLayoutChanged={jobsLayout.onLayoutChanged}
           >
-            <JobsPane
-              jobs={jobs}
-              loading={jobsLoading}
-              status={jobsStatus}
-              draftKeyword={draftKeyword}
-              selectedJobId={selectedJobId}
-              onDraftKeywordChange={setDraftKeyword}
-              onSearch={searchJobs}
-              onChooseJob={chooseJob}
-              onCopyJob={startCopyingJob}
-              onSetJobEnabled={requestSetJobEnabled}
-              onDeleteJob={requestDeleteJob}
-              onRunJob={(job) => {
-                setRunError(null);
-                setRunTarget(job);
-              }}
-              busy={actionBusy}
-              onPage={setJobsIndex}
-              t={t}
-            />
-          </ResizablePanel>
-          <ResizableHandle
-            withHandle
-            aria-label={t("resizeJobsPane")}
-          />
-          <ResizablePanel
-            id="details-panel"
-            className="workspace-panel"
-            minSize={520}
-          >
-            <section
-              id="detail-pane"
-              className="detail-pane"
-              aria-label={t("jobWorkspace")}
+            <ResizablePanel
+              id="jobs-panel"
+              panelRef={jobsLayout.panelRef}
+              className="workspace-panel"
+              minSize={240}
+              defaultSize={
+                jobsLayout.size ?? (window.innerWidth <= 800 ? "36%" : "30%")
+              }
+              groupResizeBehavior="preserve-pixel-size"
+              onResize={jobsLayout.onResize}
             >
-              <div className="detail-bar">
-                <strong>
-                  {selectedJob
-                    ? `${label(selectedJob.jobName)}  ·  #${selectedJob.id}`
-                    : t("selectJob")}
-                </strong>
-                <nav
-                  className="detail-tabs"
-                  aria-label={t("jobInfo")}
-                >
-                  <Button
-                    type="button"
-                    className={tab === "detail" ? "active" : ""}
-                    aria-current={tab === "detail" ? "page" : undefined}
-                    onClick={() => setTab("detail")}
-                  >
-                    {t("jobDetail")}
-                  </Button>
-                  <Button
-                    type="button"
-                    className={tab === "runs" ? "active" : ""}
-                    aria-current={tab === "runs" ? "page" : undefined}
-                    onClick={() => setTab("runs")}
-                  >
-                    {t("runsAndLogs")}
-                  </Button>
-                </nav>
-              </div>
+              <JobsPane
+                jobs={jobs}
+                loading={jobsLoading}
+                status={jobsStatus}
+                draftKeyword={draftKeyword}
+                selectedJobId={selectedJobId}
+                onDraftKeywordChange={setDraftKeyword}
+                onSearch={searchJobs}
+                onChooseJob={chooseJob}
+                onCopyJob={startCopyingJob}
+                onSetJobEnabled={requestSetJobEnabled}
+                onDeleteJob={requestDeleteJob}
+                onRunJob={(job) => {
+                  setRunError(null);
+                  setRunTarget(job);
+                }}
+                busy={actionBusy}
+                onPage={setJobsIndex}
+                t={t}
+              />
+            </ResizablePanel>
+            <ResizableHandle
+              withHandle
+              aria-label={t("resizeJobsPane")}
+            />
+            <ResizablePanel
+              id="details-panel"
+              className="workspace-panel"
+              minSize={520}
+            >
               <section
-                className="job-detail-view"
-                aria-label={t("jobDetail")}
-                hidden={tab !== "detail"}
+                id="detail-pane"
+                className="detail-pane"
+                aria-label={t("jobWorkspace")}
               >
-                <JobInspector
-                  key={`${appId}:${selectedJobId}:${refresh}`}
-                  detail={
-                    detail && String(detail.id) === selectedJobId
-                      ? {
-                          ...detail,
-                          enable: selectedJob?.enable ?? detail.enable,
-                        }
-                      : null
-                  }
-                  status={detailStatus}
-                  busy={actionBusy}
-                  error={editError}
-                  onSave={updateJob}
-                  onEdit={() => setEditError(null)}
+                <div className="detail-bar">
+                  <nav
+                    className="detail-tabs"
+                    aria-label={t("jobInfo")}
+                  >
+                    <Button
+                      type="button"
+                      className={tab === "detail" ? "active" : ""}
+                      aria-current={tab === "detail" ? "page" : undefined}
+                      onClick={() => setTab("detail")}
+                    >
+                      {t("jobDetail")}
+                    </Button>
+                    <Button
+                      type="button"
+                      className={tab === "runs" ? "active" : ""}
+                      aria-current={tab === "runs" ? "page" : undefined}
+                      onClick={() => setTab("runs")}
+                    >
+                      {t("runsAndLogs")}
+                    </Button>
+                  </nav>
+                  <strong>
+                    {selectedJob
+                      ? `${label(selectedJob.jobName)}  ·  #${selectedJob.id}`
+                      : t("selectJob")}
+                  </strong>
+                </div>
+                <section
+                  className="job-detail-view"
+                  aria-label={t("jobDetail")}
+                  hidden={tab !== "detail"}
+                >
+                  <JobInspector
+                    key={`${appId}:${selectedJobId}:${refresh}`}
+                    detail={
+                      detail && String(detail.id) === selectedJobId
+                        ? {
+                            ...detail,
+                            enable: selectedJob?.enable ?? detail.enable,
+                          }
+                        : null
+                    }
+                    status={detailStatus}
+                    busy={actionBusy}
+                    error={editError}
+                    onSave={updateJob}
+                    onEdit={() => setEditError(null)}
+                    locale={locale}
+                    t={t}
+                  />
+                </section>
+                <RunsPane
+                  visible={tab === "runs"}
+                  instances={instances}
+                  loading={instancesLoading}
+                  status={instancesStatus}
+                  draftInstanceId={draftInstanceId}
+                  draftType={draftType}
+                  draftStatus={draftStatus}
+                  filterType={filter.type}
+                  selectedInstanceId={selectedInstanceId}
                   locale={locale}
+                  connectionId={connectionId || ""}
+                  appId={appId}
+                  selectedJobId={selectedJobId}
+                  onDraftInstanceIdChange={setDraftInstanceId}
+                  onDraftTypeChange={(type) => {
+                    setDraftType(type);
+                    setDraftStatus("");
+                  }}
+                  onDraftStatusChange={setDraftStatus}
+                  onSearch={searchInstances}
+                  onChooseInstance={chooseInstance}
+                  onOpenInstance={setModal}
+                  onRetryInstance={requestRetryFailedInstance}
+                  busy={actionBusy}
+                  logRefresh={instancesRefresh}
+                  onPage={setInstanceIndex}
                   t={t}
                 />
               </section>
-              <RunsPane
-                visible={tab === "runs"}
-                instances={instances}
-                loading={instancesLoading}
-                status={instancesStatus}
-                draftInstanceId={draftInstanceId}
-                draftType={draftType}
-                draftStatus={draftStatus}
-                filterType={filter.type}
-                selectedInstanceId={selectedInstanceId}
-                locale={locale}
-                connectionId={connectionId || ""}
-                appId={appId}
-                selectedJobId={selectedJobId}
-                onDraftInstanceIdChange={setDraftInstanceId}
-                onDraftTypeChange={(type) => {
-                  setDraftType(type);
-                  setDraftStatus("");
-                }}
-                onDraftStatusChange={setDraftStatus}
-                onSearch={searchInstances}
-                onChooseInstance={chooseInstance}
-                onOpenInstance={setModal}
-                onRetryInstance={requestRetryFailedInstance}
-                busy={actionBusy}
-                logRefresh={instancesRefresh}
-                onPage={setInstanceIndex}
-                t={t}
-              />
-            </section>
-          </ResizablePanel>
-        </ResizablePanelGroup>
+            </ResizablePanel>
+          </ResizablePanelGroup>
+        )}
       </main>
       {(creating || copySource) && (
         <CreateJobDialog

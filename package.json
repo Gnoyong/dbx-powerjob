@@ -1,7 +1,7 @@
 {
   "name": "dbx-powerjob-ui",
   "private": true,
-  "version": "0.1.22",
+  "version": "0.1.24",
   "packageManager": "pnpm@11.9.0",
   "type": "module",
   "scripts": {
@@ -25,6 +25,7 @@
     "react-day-picker": "^10.0.1",
     "react-dom": "^19.1.1",
     "react-resizable-panels": "^4.12.4",
+    "sonner": "^2.0.8",
     "tailwind-merge": "^3.7.0"
   },
   "devDependencies": {

@@ -1,14 +1,13 @@
 import { Button } from "./ui/button";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import { useLogs, type LogExportProgress } from "../hooks/useLogs";
 import type { T } from "../uiTypes";
 
 type ExportState =
   | { status: "idle" }
-  | ({ status: "exporting" } & LogExportProgress)
-  | { status: "complete"; pageCount: number }
-  | { status: "failed" };
+  | ({ status: "exporting" } & LogExportProgress);
 
 function downloadLog(content: string, instanceId: string) {
   const url = URL.createObjectURL(new Blob([content], {
@@ -48,6 +47,7 @@ export function LogViewer({
   const scroll = useRef<HTMLDivElement>(null);
   const autoFill = useRef(0);
   const exportController = useRef<AbortController | null>(null);
+  const exportToast = useRef<string | number | undefined>(undefined);
   const [followLatest, setFollowLatest] = useState(false);
   const [exportState, setExportState] = useState<ExportState>({
     status: "idle",
@@ -76,7 +76,10 @@ export function LogViewer({
     if (scroll.current) scroll.current.scrollTop = 0;
     setFollowLatest(false);
     setExportState({ status: "idle" });
-    return () => exportController.current?.abort();
+    return () => {
+      exportController.current?.abort();
+      if (exportToast.current !== undefined) toast.dismiss(exportToast.current);
+    };
   }, [instanceId, appId]);
   useEffect(() => {
     if (!more || loading || failed || autoFill.current >= 4) return;
@@ -110,9 +113,6 @@ export function LogViewer({
       current: exportState.current,
       total: exportState.total,
     });
-  else if (exportState.status === "complete")
-    state = t("logsExported", { count: exportState.pageCount });
-  else if (exportState.status === "failed") state = t("logExportFailed");
   else if (failed) state = t("logFailed");
   else if (loading) state = t("loading");
   else if (instanceId && totalPages !== null)
@@ -167,26 +167,30 @@ export function LogViewer({
             variant="ghost"
             disabled={!instanceId || exportState.status === "exporting"}
             onClick={async () => {
-              exportController.current?.abort();
+              if (exportController.current) return;
               const controller = new AbortController();
               exportController.current = controller;
+              if (exportToast.current !== undefined) toast.dismiss(exportToast.current);
+              const toastId = toast.loading(t("exportingLogs", { current: 0, total: 0 }), { closeButton: false });
+              exportToast.current = toastId;
               setExportState({ status: "exporting", current: 0, total: 0 });
               try {
                 const exported = await exportAll((progress) => {
+                  if (controller.signal.aborted) return;
                   setExportState({ status: "exporting", ...progress });
+                  toast.loading(t("exportingLogs", progress), { id: toastId, closeButton: false });
                 }, controller.signal);
+                if (controller.signal.aborted) return;
                 downloadLog(exported.content, instanceId);
-                setExportState({
-                  status: "complete",
-                  pageCount: exported.pageCount,
-                });
+                toast.success(t("logsExported", { count: exported.pageCount }), { id: toastId, closeButton: true, duration: 4000 });
               } catch {
                 if (!controller.signal.aborted) {
-                  setExportState({ status: "failed" });
+                  toast.error(t("logExportFailed"), { id: toastId, closeButton: true, duration: 8000 });
                 }
               } finally {
                 if (exportController.current === controller) {
                   exportController.current = null;
+                  if (!controller.signal.aborted) setExportState({ status: "idle" });
                 }
               }
             }}

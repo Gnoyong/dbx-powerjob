@@ -17,6 +17,14 @@
 - **实例与日志**：实例筛选、失败普通实例重跑、日志跟随与导出。
 - **工作台**：应用切换、中英文与主题适配、可调整面板布局。
 
+任务栏宽度和日志区域高度通过 DBX `storage` 保存，插件声明 `host.storage` 权限。
+读取完成后再初始化面板；宿主不支持该能力时使用默认布局，读写失败时提供重试。
+DBX 沙箱没有可用的 `localStorage`，旧版本在沙箱中未能保存的尺寸无法恢复。
+
+操作结果、日志导出结果和布局存储错误使用 Sonner Toast，支持 DBX 主题和语言。
+加载状态和表单校验保留在原位置。`dbxPlugin.notify(method, params)` 是发送给插件后端的
+JSON-RPC 通知，不是宿主 Toast 接口，因此不能用它替代用户提示。
+
 ## 使用
 
 在 DBX「插件中心」导入 `.dbxp`，创建「PowerJob 连接」，填写主机、HTTPS 端口和账号，连接后打开「PowerJob 总览」。
@@ -50,6 +58,7 @@ pnpm run dev
 
 ```powershell
 pnpm run build
+node --test scripts/host-storage.test.mjs scripts/toast.test.mjs
 git diff --check
 ```
 
