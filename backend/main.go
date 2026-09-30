@@ -110,7 +110,7 @@ func (p *plugin) Handle(_ dbxpluginsdk.RequestContext, method string, params jso
 func main() {
 	metadata := dbxpluginsdk.Metadata{
 		ID:           pluginID,
-		Version:      "0.1.24",
+		Version:      "0.1.25",
 		Capabilities: []string{"connections"},
 	}
 	server := dbxpluginsdk.NewServer(metadata, &plugin{sessions: make(map[string]*session)})
