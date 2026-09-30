@@ -30,14 +30,14 @@ body {
   overflow: hidden;
 }
 
-button:not([data-slot="button"]):not([data-sonner-toaster] button),
+button:not([data-slot="button"]):not([data-slot="switch"]):not([data-sonner-toaster] button),
 input:not([data-slot="input"]),
 select,
 textarea {
   font: inherit;
 }
 
-button:not([data-slot="button"]):not([data-sonner-toaster] button) {
+button:not([data-slot="button"]):not([data-slot="switch"]):not([data-sonner-toaster] button) {
   min-height: 28px;
   padding: 3px 9px;
   border: 1px solid var(--color-primary, #3565c8);
@@ -49,22 +49,22 @@ button:not([data-slot="button"]):not([data-sonner-toaster] button) {
   font-size: 12px;
 }
 
-button:not([data-slot="button"]):not([data-sonner-toaster] button):hover:not(:disabled) {
+button:not([data-slot="button"]):not([data-slot="switch"]):not([data-sonner-toaster] button):hover:not(:disabled) {
   filter: brightness(.94);
 }
 
-button:not([data-slot="button"]):not([data-sonner-toaster] button):disabled {
+button:not([data-slot="button"]):not([data-slot="switch"]):not([data-sonner-toaster] button):disabled {
   opacity: .45;
   cursor: default;
 }
 
-button:not([data-slot="button"]):not([data-sonner-toaster] button).secondary {
+button:not([data-slot="button"]):not([data-slot="switch"]):not([data-sonner-toaster] button).secondary {
   border-color: var(--color-border, #d7dce5);
   background: var(--color-background, #fff);
   color: var(--color-foreground, #202631);
 }
 
-button:not([data-slot="button"]):not([data-sonner-toaster] button).ghost {
+button:not([data-slot="button"]):not([data-slot="switch"]):not([data-sonner-toaster] button).ghost {
   border-color: transparent;
   background: transparent;
   color: var(--color-muted-foreground, #677282);
@@ -85,7 +85,7 @@ textarea {
 input:not([data-slot="input"]):focus,
 select:focus,
 textarea:focus,
-button:not([data-slot="button"]):not([data-sonner-toaster] button):focus-visible {
+button:not([data-slot="button"]):not([data-slot="switch"]):not([data-sonner-toaster] button):focus-visible {
   outline: 2px solid var(--color-primary, #3565c8);
   outline-offset: 1px;
 }
@@ -1174,7 +1174,7 @@ input[data-slot="input"][aria-invalid="true"] {
   font-size: 12px;
 }
 
-.job-calendar button:not([data-slot="button"]):not([data-sonner-toaster] button) {
+.job-calendar button:not([data-slot="button"]):not([data-slot="switch"]):not([data-sonner-toaster] button) {
   min-height: 0;
   padding: 0;
   border: 0;
