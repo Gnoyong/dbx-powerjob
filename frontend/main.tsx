@@ -8,5 +8,8 @@ import "./style.css";
 document.addEventListener("contextmenu", (event) => event.preventDefault());
 
 createRoot(document.getElementById("root")!).render(
-  <React.StrictMode><App /><PluginToaster /></React.StrictMode>,
+  <React.StrictMode>
+    <App />
+    <PluginToaster />
+  </React.StrictMode>,
 );
