@@ -1,8 +1,27 @@
 import { Button } from "./ui/button";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useLogs } from "../hooks/useLogs";
+import { toast } from "sonner";
+import { useLogs, type LogExportProgress } from "../hooks/useLogs";
 import type { T } from "../uiTypes";
+
+type ExportState =
+  | { status: "idle" }
+  | ({ status: "exporting" } & LogExportProgress);
+
+function downloadLog(content: string, instanceId: string) {
+  const url = URL.createObjectURL(new Blob([content], {
+    type: "text/plain;charset=utf-8",
+  }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `powerjob-instance-${instanceId}.log`;
+  link.hidden = true;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
 
 export function LogViewer({
   connectionId,
@@ -23,10 +42,16 @@ export function LogViewer({
     totalPages,
     loadNext,
     refreshLatest,
+    exportAll,
   } = useLogs(connectionId, appId, instanceId);
   const scroll = useRef<HTMLDivElement>(null);
   const autoFill = useRef(0);
+  const exportController = useRef<AbortController | null>(null);
+  const exportToast = useRef<string | number | undefined>(undefined);
   const [followLatest, setFollowLatest] = useState(false);
+  const [exportState, setExportState] = useState<ExportState>({
+    status: "idle",
+  });
   const more = totalPages !== null && nextIndex < totalPages;
   // A page can end in the middle of a line, so split only after joining pages.
   const content = useMemo(() => pages.join(""), [pages]);
@@ -45,9 +70,16 @@ export function LogViewer({
   }
 
   useEffect(() => {
+    exportController.current?.abort();
+    exportController.current = null;
     autoFill.current = 0;
     if (scroll.current) scroll.current.scrollTop = 0;
     setFollowLatest(false);
+    setExportState({ status: "idle" });
+    return () => {
+      exportController.current?.abort();
+      if (exportToast.current !== undefined) toast.dismiss(exportToast.current);
+    };
   }, [instanceId, appId]);
   useEffect(() => {
     if (!more || loading || failed || autoFill.current >= 4) return;
@@ -76,7 +108,12 @@ export function LogViewer({
   }, [followLatest, content, totalSize]);
 
   let state = "";
-  if (failed) state = t("logFailed");
+  if (exportState.status === "exporting")
+    state = t("exportingLogs", {
+      current: exportState.current,
+      total: exportState.total,
+    });
+  else if (failed) state = t("logFailed");
   else if (loading) state = t("loading");
   else if (instanceId && totalPages !== null)
     state = more
@@ -123,6 +160,42 @@ export function LogViewer({
             }}
           >
             {t("logFollowLatest")}
+          </Button>
+          <Button
+            size="xs"
+            type="button"
+            variant="ghost"
+            disabled={!instanceId || exportState.status === "exporting"}
+            onClick={async () => {
+              if (exportController.current) return;
+              const controller = new AbortController();
+              exportController.current = controller;
+              if (exportToast.current !== undefined) toast.dismiss(exportToast.current);
+              const toastId = toast.loading(t("exportingLogs", { current: 0, total: 0 }), { closeButton: false });
+              exportToast.current = toastId;
+              setExportState({ status: "exporting", current: 0, total: 0 });
+              try {
+                const exported = await exportAll((progress) => {
+                  if (controller.signal.aborted) return;
+                  setExportState({ status: "exporting", ...progress });
+                  toast.loading(t("exportingLogs", progress), { id: toastId, closeButton: false });
+                }, controller.signal);
+                if (controller.signal.aborted) return;
+                downloadLog(exported.content, instanceId);
+                toast.success(t("logsExported", { count: exported.pageCount }), { id: toastId, closeButton: true, duration: 4000 });
+              } catch {
+                if (!controller.signal.aborted) {
+                  toast.error(t("logExportFailed"), { id: toastId, closeButton: true, duration: 8000 });
+                }
+              } finally {
+                if (exportController.current === controller) {
+                  exportController.current = null;
+                  if (!controller.signal.aborted) setExportState({ status: "idle" });
+                }
+              }
+            }}
+          >
+            {t("exportAllLogs")}
           </Button>
         </div>
         {failed && (

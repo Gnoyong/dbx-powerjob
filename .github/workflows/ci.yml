@@ -1,0 +1,97 @@
+name: Check DBX plugin
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: check-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PLUGIN_CLI_VERSION: "0.1.9"
+
+jobs:
+  versions:
+    name: Check release metadata
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check package.json and manifest.json versions match
+        run: |
+          package_version="$(node -p 'require("./package.json").version')"
+          manifest_version="$(node -p 'require("./manifest.json").version')"
+          if [ "$package_version" != "$manifest_version" ]; then
+            echo "Version mismatch: package.json=$package_version manifest.json=$manifest_version" >&2
+            exit 1
+          fi
+          echo "Release version $manifest_version"
+
+  backend:
+    name: Check Go backend
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22.x"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+
+      - name: Install DBX plugin CLI (bundles the Go plugin SDK)
+        run: npm install --global "@dbx-app/plugin-cli@$PLUGIN_CLI_VERSION"
+
+      - name: Point the backend at the bundled plugin SDK
+        run: |
+          sdk_module="$(npm root -g)/@dbx-app/plugin-cli/sdk-root/plugins/sdk/go/dbx-plugin-sdk"
+          if [ ! -f "$sdk_module/go.mod" ]; then
+            echo "Bundled Go plugin SDK not found at $sdk_module" >&2
+            exit 1
+          fi
+          printf 'go 1.22\n\nuse (\n\t%s\n\t%s\n)\n' "$GITHUB_WORKSPACE/backend" "$sdk_module" > "$RUNNER_TEMP/dbx-go.work"
+          echo "GOWORK=$RUNNER_TEMP/dbx-go.work" >> "$GITHUB_ENV"
+
+      - name: Test backend
+        working-directory: backend
+        run: go test ./...
+
+      - name: Vet backend
+        working-directory: backend
+        run: go vet ./...
+
+  package:
+    name: Package Linux candidate
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22.x"
+
+      - name: Install DBX plugin CLI
+        run: npm install --global "@dbx-app/plugin-cli@$PLUGIN_CLI_VERSION"
+
+      - name: Typecheck, build, and package
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm typecheck
+          pnpm build
+          dbx-plugin package . --target linux-x64

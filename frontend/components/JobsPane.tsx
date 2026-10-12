@@ -18,7 +18,9 @@ export function JobsPane({
   onDraftKeywordChange,
   onSearch,
   onChooseJob,
+  onCopyJob,
   onSetJobEnabled,
+  onDeleteJob,
   onRunJob,
   busy,
   onPage,
@@ -32,7 +34,9 @@ export function JobsPane({
   onDraftKeywordChange: (value: string) => void;
   onSearch: () => void;
   onChooseJob: (job: Job) => void;
+  onCopyJob: (job: Job) => void;
   onSetJobEnabled: (job: Job) => void;
+  onDeleteJob: (job: Job) => void;
   onRunJob: (job: Job) => void;
   busy: boolean;
   onPage: (index: number) => void;
@@ -82,7 +86,7 @@ export function JobsPane({
     setMenu({
       job,
       x: Math.max(4, Math.min(x, window.innerWidth - 180)),
-      y: Math.max(4, Math.min(y, window.innerHeight - 76)),
+      y: Math.max(4, Math.min(y, window.innerHeight - 108)),
     });
   }
 
@@ -229,7 +233,19 @@ export function JobsPane({
           </Button>
           <Button
             size="xs"
-
+            type="button"
+            variant="ghost"
+            role="menuitem"
+            disabled={busy}
+            onClick={() => {
+              setMenu(null);
+              onCopyJob(menu.job);
+            }}
+          >
+            {t("copyJob")}
+          </Button>
+          <Button
+            size="xs"
             type="button"
             variant="ghost"
             role="menuitem"
@@ -240,6 +256,20 @@ export function JobsPane({
             }}
           >
             {t(menu.job.enable ? "disableJob" : "enableJob")}
+          </Button>
+          <Button
+            size="xs"
+            type="button"
+            variant="ghost"
+            className="job-context-menu-delete"
+            role="menuitem"
+            disabled={busy}
+            onClick={() => {
+              setMenu(null);
+              onDeleteJob(menu.job);
+            }}
+          >
+            {t("deleteJob")}
           </Button>
         </div>
       )}

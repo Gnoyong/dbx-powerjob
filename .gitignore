@@ -9,3 +9,5 @@
 .DS_Store
 *.log
 /ui
+.build-temp
+.go-cache

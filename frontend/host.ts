@@ -8,7 +8,9 @@ type MethodResult = {
   "powerjob/instance": Record<string, unknown>;
   "powerjob/log": LogPage;
   "powerjob/setJobEnabled": { success: boolean };
+  "powerjob/deleteJob": { success: boolean };
   "powerjob/createJob": { success: boolean; jobId?: string };
+  "powerjob/copyJob": { success: boolean; jobId?: string };
   "powerjob/updateJob": { success: boolean };
   "powerjob/retryFailedInstance": { success: boolean };
   "powerjob/runJob": { instanceId: string };
@@ -17,6 +19,12 @@ type MethodResult = {
 type Context = { connectionId?: string } | null;
 type Host = {
   ready: Promise<void>;
+  capabilities?: { storage?: boolean };
+  storage?: {
+    get(key: string): Promise<unknown>;
+    set(key: string, value: unknown): Promise<unknown>;
+    delete(key: string): Promise<unknown>;
+  };
   locale?: string;
   context?: Context;
   onContext(callback: (context: Context) => void): (() => void) | void;
@@ -31,6 +39,24 @@ export function getHost(): Host {
   const host = window.dbxPlugin;
   if (!host) throw new Error("DBX plugin bridge unavailable");
   return host;
+}
+
+async function getStorage() {
+  const host = getHost();
+  await host.ready;
+  return host.capabilities?.storage ? host.storage : undefined;
+}
+
+export async function readPanelSize(key: string, minimum: number): Promise<number | null> {
+  const storage = await getStorage();
+  if (!storage) return null;
+  const value = await storage.get(key);
+  return typeof value === "number" && Number.isFinite(value) && value >= minimum ? value : null;
+}
+
+export async function writePanelSize(key: string, value: number): Promise<void> {
+  const storage = await getStorage();
+  if (storage) await storage.set(key, Math.round(value));
 }
 
 export function invoke<K extends keyof MethodResult>(

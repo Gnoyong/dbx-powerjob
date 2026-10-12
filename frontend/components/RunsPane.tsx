@@ -1,5 +1,5 @@
-import { useRef, useState } from "react";
-import type { PanelSize } from "react-resizable-panels";
+import { useStorageToast } from "../hooks/useStorageToast";
+import { useStoredPanelSize } from "../hooks/useStoredPanelSize";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { NativeSelect, NativeSelectOption } from "./ui/native-select";
@@ -74,16 +74,8 @@ export function RunsPane({
   t: T;
 }) {
   const storageKey = "local.powerjob.readonly.logs-pane-height";
-  const [savedHeight] = useState(() => {
-    try {
-      const raw = localStorage.getItem(storageKey);
-      const value = raw === null ? NaN : Number(raw);
-      return Number.isFinite(value) && value >= 150 ? value : null;
-    } catch {
-      return null;
-    }
-  });
-  const logsHeight = useRef(savedHeight ?? 0);
+  const logsLayout = useStoredPanelSize(storageKey, 150);
+  useStorageToast("logs-layout", logsLayout.failed, logsLayout.retry, t);
 
   return (
     <section
@@ -91,21 +83,12 @@ export function RunsPane({
       aria-label={t("runsAndLogs")}
       hidden={!visible}
     >
-      <ResizablePanelGroup
+
+      {!logsLayout.ready ? <div role="status">{t("loading")}</div> : <ResizablePanelGroup
         id="runs-panel-group"
         className="runs-panel-group"
         orientation="vertical"
-        onLayoutChanged={(_layout, meta) => {
-          if (!meta.isUserInteraction || logsHeight.current <= 0) return;
-          try {
-            localStorage.setItem(
-              storageKey,
-              String(Math.round(logsHeight.current)),
-            );
-          } catch {
-            /* sandboxed host */
-          }
-        }}
+        onLayoutChanged={logsLayout.onLayoutChanged}
       >
         <ResizablePanel
           id="instances-panel"
@@ -299,13 +282,12 @@ export function RunsPane({
         />
         <ResizablePanel
           id="logs-panel"
+          panelRef={logsLayout.panelRef}
           className="runs-panel"
           minSize={150}
-          defaultSize={savedHeight ?? "58%"}
+          defaultSize={logsLayout.size ?? "58%"}
           groupResizeBehavior="preserve-pixel-size"
-          onResize={(size: PanelSize) => {
-            logsHeight.current = size.inPixels;
-          }}
+          onResize={logsLayout.onResize}
         >
           <LogViewer
             key={`${appId}:${selectedJobId}:${selectedInstanceId}:${logRefresh}`}
@@ -315,7 +297,7 @@ export function RunsPane({
             t={t}
           />
         </ResizablePanel>
-      </ResizablePanelGroup>
+      </ResizablePanelGroup>}
     </section>
   );
 }

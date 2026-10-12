@@ -2,6 +2,10 @@ import { Button } from "./components/ui/button";
 import { useEffect, useRef, useState } from "react";
 import { label } from "./format";
 import { getHost, invoke } from "./host";
+import { toast } from "sonner";
+import { notifyAction } from "./notifications";
+import type { ActionNotificationKey } from "./notifications";
+import { useStorageToast } from "./hooks/useStorageToast";
 import { normalizeLocale, translate } from "./i18n";
 import type { Locale, TranslationKey } from "./i18n";
 import type {
@@ -21,14 +25,19 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "./components/ui/resizable";
-import type { PanelSize } from "react-resizable-panels";
+import { useStoredPanelSize } from "./hooks/useStoredPanelSize";
 import { JobInspector } from "./components/JobInspector";
 import { InstanceDialog } from "./components/InstanceDialog";
 import { RunJobDialog } from "./components/RunJobDialog";
 import { CreateJobDialog } from "./components/CreateJobDialog";
+import { ConfirmActionDialog } from "./components/ConfirmActionDialog";
 
 type Tab = "detail" | "runs";
 type Filter = { type: InstanceType; instanceId: string; status: string };
+type Confirmation =
+  | { kind: "jobEnabled"; job: Job; enabled: boolean }
+  | { kind: "deleteJob"; job: Job }
+  | { kind: "retryInstance"; instance: Instance; jobId: string };
 const jobsPaneStorageKey = "local.powerjob.readonly.jobs-pane-width";
 const applicationStorageKey = "local.powerjob.readonly.last-application";
 const instancePollIntervalMs = 3000;
@@ -77,7 +86,7 @@ function actionErrorKey(error: unknown): TranslationKey | null {
   if (/rejected the request|denied access/i.test(message))
     return "powerJobDenied";
   if (
-    /already changed|exported job changed|only failed normal instances|job was not updated/i.test(
+    /already changed|exported job changed|only failed normal instances|job was not updated|job was not found/i.test(
       message,
     )
   )
@@ -121,26 +130,24 @@ export default function App() {
   const [selectedInstanceId, setSelectedInstanceId] = useState("");
   const [modal, setModal] = useState<Instance | null>(null);
   const [runTarget, setRunTarget] = useState<Job | null>(null);
+  const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const [creating, setCreating] = useState(false);
+  const [copySource, setCopySource] = useState<{
+    jobId: string;
+    detail: JobDetail;
+  } | null>(null);
   const [editError, setEditError] = useState<TranslationKey | null>(null);
   const [runError, setRunError] = useState<TranslationKey | null>(null);
-  const [runInstanceId, setRunInstanceId] = useState("");
   const [refresh, setRefresh] = useState(0);
   const [instancesRefresh, setInstancesRefresh] = useState(0);
-  const [actionStatus, setActionStatus] = useState<TranslationKey | null>(null);
-  const [actionError, setActionError] = useState<TranslationKey | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
   const actionPending = useRef(false);
-  const [savedJobsWidth] = useState(() => {
-    try {
-      const raw = localStorage.getItem(jobsPaneStorageKey);
-      const value = raw === null ? NaN : Number(raw);
-      return Number.isFinite(value) && value >= 240 ? value : null;
-    } catch {
-      return null;
-    }
-  });
-  const jobsWidth = useRef(savedJobsWidth ?? 0);
+  const jobsLayout = useStoredPanelSize(jobsPaneStorageKey, 240);
+  useStorageToast("jobs-layout", jobsLayout.failed, jobsLayout.retry, t);
+  function showAction(key: ActionNotificationKey | null, detail?: TranslationKey | null, vars?: Record<string, string | number>) {
+    notifyAction(t, key, detail, vars);
+  }
+  useEffect(() => () => { toast.dismiss("powerjob-action"); }, []);
   const currentScope = useRef("");
   currentScope.current = `${connectionId}:${appId}`;
   const [appsRefresh, setAppsRefresh] = useState(0);
@@ -150,6 +157,8 @@ export default function App() {
     setRunTarget(null);
     setEditError(null);
     setCreating(false);
+    setCopySource(null);
+    setConfirmation(null);
   }, [connectionId, appId]);
 
   useEffect(() => {
@@ -207,8 +216,7 @@ export default function App() {
     setInstances(null);
     setSelectedInstanceId("");
     setModal(null);
-    setActionStatus(null);
-    setActionError(null);
+    showAction(null);
   }, [connectionId]);
 
   useEffect(() => {
@@ -269,8 +277,7 @@ export default function App() {
     setInstances(null);
     setSelectedInstanceId("");
     setModal(null);
-    setActionStatus(null);
-    setActionError(null);
+    showAction(null);
   }, [appId]);
 
   useEffect(() => {
@@ -424,6 +431,7 @@ export default function App() {
   }
   function chooseApp(next: string) {
     setCreating(false);
+    setCopySource(null);
     setAppId(next);
     saveApplication(connectionId ?? "", next, apps?.index ?? appsIndex);
     setJobsIndex(0);
@@ -468,8 +476,7 @@ export default function App() {
     actionPending.current = true;
     const scope = currentScope.current;
     setActionBusy(true);
-    setActionStatus("savingJob");
-    setActionError(null);
+    showAction("savingJob");
     setEditError(null);
     try {
       await invoke(connectionId, "powerjob/updateJob", {
@@ -478,14 +485,13 @@ export default function App() {
         changes,
       });
       if (currentScope.current === scope) {
-        setActionStatus("jobUpdated");
+        showAction("jobUpdated");
         setRefresh((value) => value + 1);
       }
     } catch (error) {
       if (currentScope.current === scope) {
-        setActionStatus("jobUpdateFailed");
         const key = actionErrorKey(error);
-        setActionError(key);
+        showAction("jobUpdateFailed", key);
         setEditError(key);
       }
     } finally {
@@ -499,21 +505,19 @@ export default function App() {
     actionPending.current = true;
     const scope = currentScope.current;
     setActionBusy(true);
-    setActionStatus("creatingJob");
-    setActionError(null);
+    showAction("creatingJob");
     setEditError(null);
     try {
       await invoke(connectionId, "powerjob/createJob", { appId, job });
       if (currentScope.current === scope) {
         setCreating(false);
-        setActionStatus("jobCreated");
+        showAction("jobCreated");
         setRefresh((value) => value + 1);
       }
     } catch (error) {
       if (currentScope.current === scope) {
-        setActionStatus("jobCreateFailed");
         const key = actionErrorKey(error);
-        setActionError(key);
+        showAction("jobCreateFailed", key);
         setEditError(key);
       }
     } finally {
@@ -522,12 +526,71 @@ export default function App() {
     }
   }
 
+  async function copyJob(job: Record<string, unknown>) {
+    if (!connectionId || !appId || !copySource || actionPending.current) return;
+    actionPending.current = true;
+    const scope = currentScope.current;
+    setActionBusy(true);
+    showAction("creatingJob");
+    setEditError(null);
+    try {
+      await invoke(connectionId, "powerjob/copyJob", {
+        appId,
+        jobId: copySource.jobId,
+        job,
+      });
+      if (currentScope.current === scope) {
+        setCopySource(null);
+        showAction("jobCopied");
+        setRefresh((value) => value + 1);
+      }
+    } catch (error) {
+      if (currentScope.current === scope) {
+        const key = actionErrorKey(error);
+        showAction("jobCopyFailed", key);
+        setEditError(key ?? "jobCopyFailed");
+      }
+    } finally {
+      actionPending.current = false;
+      setActionBusy(false);
+    }
+  }
+
+  async function startCopyingJob(job: Job) {
+    if (!connectionId || !appId || actionPending.current) return;
+    actionPending.current = true;
+    const scope = currentScope.current;
+    setActionBusy(true);
+    showAction("loadingJobCopy");
+    setEditError(null);
+    setCreating(false);
+    setCopySource(null);
+    try {
+      const value = await invoke(connectionId, "powerjob/job", {
+        appId,
+        jobId: job.id,
+      });
+      if (currentScope.current === scope) {
+        setCopySource({
+          jobId: String(job.id),
+          detail: { ...value, jobName: value.jobName ?? job.jobName ?? "" },
+        });
+        showAction(null);
+      }
+    } catch {
+      if (currentScope.current === scope) showAction("jobCopyLoadFailed");
+    } finally {
+      actionPending.current = false;
+      setActionBusy(false);
+    }
+  }
+
   function startCreatingJob() {
     if (!connectionId || !appId || actionBusy) return;
+    setCopySource(null);
     setCreating(true);
     setEditError(null);
-    setActionStatus(null);
-    setActionError(null);
+    showAction(null);
   }
   function chooseInstance(instance: Instance) {
     setSelectedInstanceId(String(instance.instanceId));
@@ -542,7 +605,7 @@ export default function App() {
     }
   }
 
-  async function setJobEnabled(job: Job) {
+  function requestSetJobEnabled(job: Job) {
     if (
       !connectionId ||
       !appId ||
@@ -550,21 +613,15 @@ export default function App() {
       actionPending.current
     )
       return;
-    const enabled = !job.enable;
-    if (
-      !window.confirm(
-        t(enabled ? "confirmEnableJob" : "confirmDisableJob", {
-          name: label(job.jobName),
-          id: job.id,
-        }),
-      )
-    )
-      return;
+    setConfirmation({ kind: "jobEnabled", job, enabled: !job.enable });
+  }
+
+  async function setJobEnabled(job: Job, enabled: boolean) {
+    if (!connectionId || !appId || actionPending.current) return;
     actionPending.current = true;
     const scope = currentScope.current;
     setActionBusy(true);
-    setActionStatus("savingJob");
-    setActionError(null);
+    showAction("savingJob");
     try {
       await invoke(connectionId, "powerjob/setJobEnabled", {
         appId,
@@ -572,7 +629,7 @@ export default function App() {
         enabled,
       });
       if (currentScope.current === scope) {
-        setActionStatus(enabled ? "jobEnabled" : "jobDisabled");
+        showAction(enabled ? "jobEnabled" : "jobDisabled");
         setJobs((previous) => {
           if (!previous) return previous;
           const index = previous.data.findIndex(
@@ -588,8 +645,48 @@ export default function App() {
       }
     } catch (error) {
       if (currentScope.current === scope) {
-        setActionStatus("jobActionFailed");
-        setActionError(actionErrorKey(error));
+        showAction("jobActionFailed", actionErrorKey(error));
+      }
+    } finally {
+      actionPending.current = false;
+      setActionBusy(false);
+    }
+  }
+
+  function requestDeleteJob(job: Job) {
+    if (!connectionId || !appId || actionPending.current) return;
+    setConfirmation({ kind: "deleteJob", job });
+  }
+
+  async function deleteJob(job: Job) {
+    if (!connectionId || !appId || actionPending.current) return;
+    actionPending.current = true;
+    const scope = currentScope.current;
+    setActionBusy(true);
+    showAction("deletingJob");
+    try {
+      await invoke(connectionId, "powerjob/deleteJob", {
+        appId,
+        jobId: job.id,
+      });
+      if (currentScope.current === scope) {
+        showAction("jobDeleted");
+        if (String(job.id) === selectedJobId) {
+          setSelectedJobId("");
+          setDetail(null);
+          setInstances(null);
+          setSelectedInstanceId("");
+          setModal(null);
+        }
+        if (jobs?.data.length === 1 && jobsIndex > 0) {
+          setJobsIndex((value) => Math.max(0, value - 1));
+        } else {
+          setRefresh((value) => value + 1);
+        }
+      }
+    } catch (error) {
+      if (currentScope.current === scope) {
+        showAction("jobDeleteFailed", actionErrorKey(error));
       }
     } finally {
       actionPending.current = false;
@@ -604,8 +701,7 @@ export default function App() {
     actionPending.current = true;
     setActionBusy(true);
     setRunError(null);
-    setActionStatus("runningJob");
-    setActionError(null);
+    showAction("runningJob");
     try {
       const result = await invoke(connectionId, "powerjob/runJob", {
         appId,
@@ -613,8 +709,7 @@ export default function App() {
         instanceParams,
       });
       if (currentScope.current === scope) {
-        setRunInstanceId(result.instanceId);
-        setActionStatus("jobRunRequested");
+        showAction("jobRunRequested", null, { id: result.instanceId });
         setRunTarget(null);
         setSelectedJobId(String(job.id));
         setInstanceIndex(0);
@@ -630,8 +725,7 @@ export default function App() {
       if (currentScope.current === scope) {
         const key = actionErrorKey(error) ?? "runJobFailed";
         setRunError(key);
-        setActionStatus("runJobFailed");
-        setActionError(actionErrorKey(error));
+        showAction("runJobFailed", actionErrorKey(error));
       }
     } finally {
       actionPending.current = false;
@@ -639,7 +733,7 @@ export default function App() {
     }
   }
 
-  async function retryFailedInstance(instance: Instance) {
+  function requestRetryFailedInstance(instance: Instance) {
     if (
       !connectionId ||
       !appId ||
@@ -648,28 +742,29 @@ export default function App() {
       filter.type !== "NORMAL"
     )
       return;
-    if (!window.confirm(t("confirmRetryFailed", { id: instance.instanceId })))
-      return;
+    setConfirmation({ kind: "retryInstance", instance, jobId: selectedJobId });
+  }
+
+  async function retryFailedInstance(instance: Instance, jobId: string) {
+    if (!connectionId || !appId || actionPending.current) return;
     actionPending.current = true;
     const scope = currentScope.current;
     setActionBusy(true);
-    setActionStatus("retryingInstance");
-    setActionError(null);
+    showAction("retryingInstance");
     try {
       await invoke(connectionId, "powerjob/retryFailedInstance", {
         appId,
-        jobId: selectedJobId,
+        jobId,
         instanceId: instance.instanceId,
       });
       if (currentScope.current === scope) {
-        setActionStatus("instanceRetried");
+        showAction("instanceRetried");
         setModal(null);
         setInstancesRefresh((value) => value + 1);
       }
     } catch (error) {
       if (currentScope.current === scope) {
-        setActionStatus("retryFailedMessage");
-        setActionError(actionErrorKey(error));
+        showAction("retryFailedMessage", actionErrorKey(error));
       }
     } finally {
       actionPending.current = false;
@@ -708,173 +803,162 @@ export default function App() {
           {t(message)}
         </div>
       )}
-      {actionStatus && (
-        <div
-          role="status"
-          aria-live="polite"
-          className={`message ${actionStatus === "jobEnabled" || actionStatus === "jobDisabled" || actionStatus === "instanceRetried" || actionStatus === "jobRunRequested" || actionStatus === "jobUpdated" || actionStatus === "jobCreated" ? "success" : ""}`}
-        >
-          {t(actionStatus, { id: runInstanceId })}
-          {actionError && ` ${t(actionError)}`}
-        </div>
-      )}
+
+
       <main className="workspace">
-        <ResizablePanelGroup
-          id="workspace-panel-group"
-          className="workspace-panel-group"
-          orientation="horizontal"
-          onLayoutChanged={(_layout, meta) => {
-            if (!meta.isUserInteraction || jobsWidth.current <= 0) return;
-            try {
-              localStorage.setItem(
-                jobsPaneStorageKey,
-                String(Math.round(jobsWidth.current)),
-              );
-            } catch {
-              /* sandboxed host */
-            }
-          }}
-        >
-          <ResizablePanel
-            id="jobs-panel"
-            className="workspace-panel"
-            minSize={240}
-            defaultSize={
-              savedJobsWidth ?? (window.innerWidth <= 800 ? "36%" : "30%")
-            }
-            groupResizeBehavior="preserve-pixel-size"
-            onResize={(size: PanelSize) => {
-              jobsWidth.current = size.inPixels;
-            }}
+        {!jobsLayout.ready ? (
+          <div role="status">{t("loading")}</div>
+        ) : (
+          <ResizablePanelGroup
+            id="workspace-panel-group"
+            className="workspace-panel-group"
+            orientation="horizontal"
+            onLayoutChanged={jobsLayout.onLayoutChanged}
           >
-            <JobsPane
-              jobs={jobs}
-              loading={jobsLoading}
-              status={jobsStatus}
-              draftKeyword={draftKeyword}
-              selectedJobId={selectedJobId}
-              onDraftKeywordChange={setDraftKeyword}
-              onSearch={searchJobs}
-              onChooseJob={chooseJob}
-              onSetJobEnabled={setJobEnabled}
-              onRunJob={(job) => {
-                setRunError(null);
-                setRunTarget(job);
-              }}
-              busy={actionBusy}
-              onPage={setJobsIndex}
-              t={t}
-            />
-          </ResizablePanel>
-          <ResizableHandle
-            withHandle
-            aria-label={t("resizeJobsPane")}
-          />
-          <ResizablePanel
-            id="details-panel"
-            className="workspace-panel"
-            minSize={520}
-          >
-            <section
-              id="detail-pane"
-              className="detail-pane"
-              aria-label={t("jobWorkspace")}
+            <ResizablePanel
+              id="jobs-panel"
+              panelRef={jobsLayout.panelRef}
+              className="workspace-panel"
+              minSize={240}
+              defaultSize={
+                jobsLayout.size ?? (window.innerWidth <= 800 ? "36%" : "30%")
+              }
+              groupResizeBehavior="preserve-pixel-size"
+              onResize={jobsLayout.onResize}
             >
-              <div className="detail-bar">
-                <strong>
-                  {selectedJob
-                    ? `${label(selectedJob.jobName)}  ·  #${selectedJob.id}`
-                    : t("selectJob")}
-                </strong>
-                <nav
-                  className="detail-tabs"
-                  aria-label={t("jobInfo")}
-                >
-                  <Button
-                    type="button"
-                    className={tab === "detail" ? "active" : ""}
-                    aria-current={tab === "detail" ? "page" : undefined}
-                    onClick={() => setTab("detail")}
-                  >
-                    {t("jobDetail")}
-                  </Button>
-                  <Button
-                    type="button"
-                    className={tab === "runs" ? "active" : ""}
-                    aria-current={tab === "runs" ? "page" : undefined}
-                    onClick={() => setTab("runs")}
-                  >
-                    {t("runsAndLogs")}
-                  </Button>
-                </nav>
-              </div>
+              <JobsPane
+                jobs={jobs}
+                loading={jobsLoading}
+                status={jobsStatus}
+                draftKeyword={draftKeyword}
+                selectedJobId={selectedJobId}
+                onDraftKeywordChange={setDraftKeyword}
+                onSearch={searchJobs}
+                onChooseJob={chooseJob}
+                onCopyJob={startCopyingJob}
+                onSetJobEnabled={requestSetJobEnabled}
+                onDeleteJob={requestDeleteJob}
+                onRunJob={(job) => {
+                  setRunError(null);
+                  setRunTarget(job);
+                }}
+                busy={actionBusy}
+                onPage={setJobsIndex}
+                t={t}
+              />
+            </ResizablePanel>
+            <ResizableHandle
+              withHandle
+              aria-label={t("resizeJobsPane")}
+            />
+            <ResizablePanel
+              id="details-panel"
+              className="workspace-panel"
+              minSize={520}
+            >
               <section
-                className="job-detail-view"
-                aria-label={t("jobDetail")}
-                hidden={tab !== "detail"}
+                id="detail-pane"
+                className="detail-pane"
+                aria-label={t("jobWorkspace")}
               >
-                <JobInspector
-                  key={`${appId}:${selectedJobId}:${refresh}`}
-                  detail={
-                    detail && String(detail.id) === selectedJobId
-                      ? {
-                          ...detail,
-                          enable: selectedJob?.enable ?? detail.enable,
-                        }
-                      : null
-                  }
-                  status={detailStatus}
-                  busy={actionBusy}
-                  error={editError}
-                  onSave={updateJob}
-                  onEdit={() => setEditError(null)}
+                <div className="detail-bar">
+                  <nav
+                    className="detail-tabs"
+                    aria-label={t("jobInfo")}
+                  >
+                    <Button
+                      type="button"
+                      className={tab === "detail" ? "active" : ""}
+                      aria-current={tab === "detail" ? "page" : undefined}
+                      onClick={() => setTab("detail")}
+                    >
+                      {t("jobDetail")}
+                    </Button>
+                    <Button
+                      type="button"
+                      className={tab === "runs" ? "active" : ""}
+                      aria-current={tab === "runs" ? "page" : undefined}
+                      onClick={() => setTab("runs")}
+                    >
+                      {t("runsAndLogs")}
+                    </Button>
+                  </nav>
+                  <strong>
+                    {selectedJob
+                      ? `${label(selectedJob.jobName)}  ·  #${selectedJob.id}`
+                      : t("selectJob")}
+                  </strong>
+                </div>
+                <section
+                  className="job-detail-view"
+                  aria-label={t("jobDetail")}
+                  hidden={tab !== "detail"}
+                >
+                  <JobInspector
+                    key={`${appId}:${selectedJobId}:${refresh}`}
+                    detail={
+                      detail && String(detail.id) === selectedJobId
+                        ? {
+                            ...detail,
+                            enable: selectedJob?.enable ?? detail.enable,
+                          }
+                        : null
+                    }
+                    status={detailStatus}
+                    busy={actionBusy}
+                    error={editError}
+                    onSave={updateJob}
+                    onEdit={() => setEditError(null)}
+                    locale={locale}
+                    t={t}
+                  />
+                </section>
+                <RunsPane
+                  visible={tab === "runs"}
+                  instances={instances}
+                  loading={instancesLoading}
+                  status={instancesStatus}
+                  draftInstanceId={draftInstanceId}
+                  draftType={draftType}
+                  draftStatus={draftStatus}
+                  filterType={filter.type}
+                  selectedInstanceId={selectedInstanceId}
                   locale={locale}
+                  connectionId={connectionId || ""}
+                  appId={appId}
+                  selectedJobId={selectedJobId}
+                  onDraftInstanceIdChange={setDraftInstanceId}
+                  onDraftTypeChange={(type) => {
+                    setDraftType(type);
+                    setDraftStatus("");
+                  }}
+                  onDraftStatusChange={setDraftStatus}
+                  onSearch={searchInstances}
+                  onChooseInstance={chooseInstance}
+                  onOpenInstance={setModal}
+                  onRetryInstance={requestRetryFailedInstance}
+                  busy={actionBusy}
+                  logRefresh={instancesRefresh}
+                  onPage={setInstanceIndex}
                   t={t}
                 />
               </section>
-              <RunsPane
-                visible={tab === "runs"}
-                instances={instances}
-                loading={instancesLoading}
-                status={instancesStatus}
-                draftInstanceId={draftInstanceId}
-                draftType={draftType}
-                draftStatus={draftStatus}
-                filterType={filter.type}
-                selectedInstanceId={selectedInstanceId}
-                locale={locale}
-                connectionId={connectionId || ""}
-                appId={appId}
-                selectedJobId={selectedJobId}
-                onDraftInstanceIdChange={setDraftInstanceId}
-                onDraftTypeChange={(type) => {
-                  setDraftType(type);
-                  setDraftStatus("");
-                }}
-                onDraftStatusChange={setDraftStatus}
-                onSearch={searchInstances}
-                onChooseInstance={chooseInstance}
-                onOpenInstance={setModal}
-                onRetryInstance={retryFailedInstance}
-                busy={actionBusy}
-                logRefresh={instancesRefresh}
-                onPage={setInstanceIndex}
-                t={t}
-              />
-            </section>
-          </ResizablePanel>
-        </ResizablePanelGroup>
+            </ResizablePanel>
+          </ResizablePanelGroup>
+        )}
       </main>
-      {creating && (
+      {(creating || copySource) && (
         <CreateJobDialog
-          key={appId}
+          key={copySource ? `${appId}:${copySource.jobId}` : appId}
           busy={actionBusy}
+          copySource={copySource?.detail}
           error={editError}
           locale={locale}
-          onCreate={createJob}
+          onCreate={copySource ? copyJob : createJob}
           onClose={() => {
             if (actionBusy) return;
             setCreating(false);
+            setCopySource(null);
             setEditError(null);
           }}
           onEdit={() => setEditError(null)}
@@ -901,6 +985,59 @@ export default function App() {
           error={runError}
           onRun={runJob}
           onClose={() => setRunTarget(null)}
+          t={t}
+        />
+      )}
+      {confirmation && (
+        <ConfirmActionDialog
+          title={
+            confirmation.kind === "jobEnabled"
+              ? t(confirmation.enabled ? "enableJob" : "disableJob")
+              : confirmation.kind === "deleteJob"
+                ? t("deleteJob")
+                : t("retryFailed")
+          }
+          message={
+            confirmation.kind === "jobEnabled"
+              ? t(
+                  confirmation.enabled
+                    ? "confirmEnableJob"
+                    : "confirmDisableJob",
+                  {
+                    name: label(confirmation.job.jobName),
+                    id: confirmation.job.id,
+                  },
+                )
+              : confirmation.kind === "deleteJob"
+                ? t("confirmDeleteJob", {
+                    name: label(confirmation.job.jobName),
+                    id: confirmation.job.id,
+                  })
+                : t("confirmRetryFailed", {
+                    id: confirmation.instance.instanceId,
+                  })
+          }
+          confirmLabel={
+            confirmation.kind === "jobEnabled"
+              ? t(confirmation.enabled ? "enableJob" : "disableJob")
+              : confirmation.kind === "deleteJob"
+                ? t("deleteJob")
+                : t("retryFailed")
+          }
+          destructive={confirmation.kind === "deleteJob"}
+          busy={actionBusy}
+          onConfirm={() => {
+            const target = confirmation;
+            setConfirmation(null);
+            if (target.kind === "jobEnabled") {
+              void setJobEnabled(target.job, target.enabled);
+            } else if (target.kind === "deleteJob") {
+              void deleteJob(target.job);
+            } else {
+              void retryFailedInstance(target.instance, target.jobId);
+            }
+          }}
+          onClose={() => setConfirmation(null)}
           t={t}
         />
       )}
