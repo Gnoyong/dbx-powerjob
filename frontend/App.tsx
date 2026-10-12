@@ -1,7 +1,8 @@
 import { Button } from "./components/ui/button";
 import { useEffect, useRef, useState } from "react";
 import { label } from "./format";
-import { getHost, invoke } from "./host";
+import { getHost, invoke, readSavedApplication, writeSavedApplication } from "./host";
+import type { SavedApplication } from "./host";
 import { toast } from "sonner";
 import { notifyAction } from "./notifications";
 import type { ActionNotificationKey } from "./notifications";
@@ -39,45 +40,7 @@ type Confirmation =
   | { kind: "deleteJob"; job: Job }
   | { kind: "retryInstance"; instance: Instance; jobId: string };
 const jobsPaneStorageKey = "local.powerjob.readonly.jobs-pane-width";
-const applicationStorageKey = "local.powerjob.readonly.last-application";
 const instancePollIntervalMs = 3000;
-
-type SavedApplication = { appId: string; pageIndex: number };
-
-function applicationStorageKeyFor(connectionId: string) {
-  return `${applicationStorageKey}:${connectionId}`;
-}
-
-function readSavedApplication(connectionId: string): SavedApplication | null {
-  try {
-    const raw = localStorage.getItem(applicationStorageKeyFor(connectionId));
-    if (!raw) return null;
-    const value = JSON.parse(raw) as Partial<SavedApplication>;
-    if (
-      typeof value.appId !== "string" ||
-      !value.appId ||
-      typeof value.pageIndex !== "number" ||
-      !Number.isInteger(value.pageIndex) ||
-      value.pageIndex < 0
-    )
-      return null;
-    return { appId: value.appId, pageIndex: value.pageIndex };
-  } catch {
-    return null;
-  }
-}
-
-function saveApplication(connectionId: string, appId: string, pageIndex: number) {
-  if (!connectionId || !appId) return;
-  try {
-    localStorage.setItem(
-      applicationStorageKeyFor(connectionId),
-      JSON.stringify({ appId, pageIndex }),
-    );
-  } catch {
-    /* sandboxed host */
-  }
-}
 function actionErrorKey(error: unknown): TranslationKey | null {
   const message = error instanceof Error ? error.message : "";
   if (/read.only/i.test(message)) return "readOnlyAction";
@@ -101,6 +64,9 @@ export default function App() {
   const [connectionId, setConnectionId] = useState<string | null>(null);
   const [hostFailed, setHostFailed] = useState(false);
   const [appsIndex, setAppsIndex] = useState(0);
+  const [restoredConnectionId, setRestoredConnectionId] = useState<string | null>(null);
+  const pendingSavedApplication = useRef<SavedApplication | null>(null);
+  const applicationWrites = useRef(Promise.resolve());
   const [apps, setApps] = useState<Page<AppInfo> | null>(null);
   const [appsStatus, setAppsStatus] = useState<TranslationKey>("loading");
   const [appId, setAppId] = useState("");
@@ -203,9 +169,11 @@ export default function App() {
   }, [locale]);
 
   useEffect(() => {
+    let active = true;
     appPageEdge.current = null;
-    const saved = connectionId ? readSavedApplication(connectionId) : null;
-    setAppsIndex(saved?.pageIndex ?? 0);
+    pendingSavedApplication.current = null;
+    setRestoredConnectionId(null);
+    setAppsIndex(0);
     setApps(null);
     setAppId("");
     setJobsIndex(0);
@@ -217,6 +185,21 @@ export default function App() {
     setSelectedInstanceId("");
     setModal(null);
     showAction(null);
+    if (connectionId) {
+      void readSavedApplication(connectionId)
+        .then((saved) => {
+          if (!active) return;
+          pendingSavedApplication.current = saved;
+          setAppsIndex(saved?.pageIndex ?? 0);
+          setRestoredConnectionId(connectionId);
+        })
+        .catch(() => {
+          if (!active) return;
+          toast.error(t("applicationStorageFailed"), { id: "application-storage" });
+          setRestoredConnectionId(connectionId);
+        });
+    }
+    return () => { active = false; };
   }, [connectionId]);
 
   useEffect(() => {
@@ -224,6 +207,7 @@ export default function App() {
       setAppsStatus(connectionId === null ? "loading" : "selectConnection");
       return;
     }
+    if (restoredConnectionId !== connectionId) return;
     let active = true;
     setAppsStatus("loading");
     void invoke(connectionId, "powerjob/apps", {
@@ -233,15 +217,17 @@ export default function App() {
       .then((page) => {
         if (!active) return;
         if (!page.data.length && appsIndex > 0) {
+          pendingSavedApplication.current = null;
           setAppsIndex(0);
           return;
         }
         const edge = appPageEdge.current;
         appPageEdge.current = null;
+        const saved = pendingSavedApplication.current;
+        pendingSavedApplication.current = null;
         setApps(page);
         setAppsStatus(page.data.length ? "loading" : "noApps");
         setAppId((previous) => {
-          const saved = readSavedApplication(connectionId);
           const savedIsAvailable =
             !edge && saved?.pageIndex === page.index &&
             page.data.some((item) => String(item.id) === saved.appId);
@@ -254,7 +240,6 @@ export default function App() {
               : String(
                   page.data[edge === "last" ? page.data.length - 1 : 0]?.id ?? "",
                 );
-          if (next) saveApplication(connectionId, next, page.index);
           return next;
         });
       })
@@ -268,7 +253,19 @@ export default function App() {
     return () => {
       active = false;
     };
-  }, [connectionId, appsIndex, appsRefresh]);
+  }, [connectionId, restoredConnectionId, appsIndex, appsRefresh]);
+
+  useEffect(() => {
+    if (!connectionId || restoredConnectionId !== connectionId || !appId ||
+      !apps || apps.index !== appsIndex ||
+      !apps.data.some((item) => String(item.id) === appId)) return;
+    const selection = { appId, pageIndex: apps.index };
+    applicationWrites.current = applicationWrites.current
+      .catch(() => {})
+      .then(() => writeSavedApplication(connectionId, selection))
+      .then(() => { toast.dismiss("application-storage"); })
+      .catch(() => { toast.error(t("applicationStorageFailed"), { id: "application-storage" }); });
+  }, [connectionId, restoredConnectionId, appId, apps, appsIndex]);
 
   useEffect(() => {
     setJobsIndex(0);
@@ -433,7 +430,6 @@ export default function App() {
     setCreating(false);
     setCopySource(null);
     setAppId(next);
-    saveApplication(connectionId ?? "", next, apps?.index ?? appsIndex);
     setJobsIndex(0);
     setDetail(null);
   }
