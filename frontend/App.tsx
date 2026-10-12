@@ -30,7 +30,45 @@ import { CreateJobDialog } from "./components/CreateJobDialog";
 type Tab = "detail" | "runs";
 type Filter = { type: InstanceType; instanceId: string; status: string };
 const jobsPaneStorageKey = "local.powerjob.readonly.jobs-pane-width";
+const applicationStorageKey = "local.powerjob.readonly.last-application";
 const instancePollIntervalMs = 3000;
+
+type SavedApplication = { appId: string; pageIndex: number };
+
+function applicationStorageKeyFor(connectionId: string) {
+  return `${applicationStorageKey}:${connectionId}`;
+}
+
+function readSavedApplication(connectionId: string): SavedApplication | null {
+  try {
+    const raw = localStorage.getItem(applicationStorageKeyFor(connectionId));
+    if (!raw) return null;
+    const value = JSON.parse(raw) as Partial<SavedApplication>;
+    if (
+      typeof value.appId !== "string" ||
+      !value.appId ||
+      typeof value.pageIndex !== "number" ||
+      !Number.isInteger(value.pageIndex) ||
+      value.pageIndex < 0
+    )
+      return null;
+    return { appId: value.appId, pageIndex: value.pageIndex };
+  } catch {
+    return null;
+  }
+}
+
+function saveApplication(connectionId: string, appId: string, pageIndex: number) {
+  if (!connectionId || !appId) return;
+  try {
+    localStorage.setItem(
+      applicationStorageKeyFor(connectionId),
+      JSON.stringify({ appId, pageIndex }),
+    );
+  } catch {
+    /* sandboxed host */
+  }
+}
 function actionErrorKey(error: unknown): TranslationKey | null {
   const message = error instanceof Error ? error.message : "";
   if (/read.only/i.test(message)) return "readOnlyAction";
@@ -157,7 +195,8 @@ export default function App() {
 
   useEffect(() => {
     appPageEdge.current = null;
-    setAppsIndex(0);
+    const saved = connectionId ? readSavedApplication(connectionId) : null;
+    setAppsIndex(saved?.pageIndex ?? 0);
     setApps(null);
     setAppId("");
     setJobsIndex(0);
@@ -185,17 +224,31 @@ export default function App() {
     })
       .then((page) => {
         if (!active) return;
+        if (!page.data.length && appsIndex > 0) {
+          setAppsIndex(0);
+          return;
+        }
         const edge = appPageEdge.current;
         appPageEdge.current = null;
         setApps(page);
         setAppsStatus(page.data.length ? "loading" : "noApps");
-        setAppId((previous) =>
-          !edge && page.data.some((item) => String(item.id) === previous)
-            ? previous
-            : String(
-                page.data[edge === "last" ? page.data.length - 1 : 0]?.id ?? "",
-              ),
-        );
+        setAppId((previous) => {
+          const saved = readSavedApplication(connectionId);
+          const savedIsAvailable =
+            !edge && saved?.pageIndex === page.index &&
+            page.data.some((item) => String(item.id) === saved.appId);
+          const previousIsAvailable =
+            !edge && page.data.some((item) => String(item.id) === previous);
+          const next = savedIsAvailable
+            ? saved.appId
+            : previousIsAvailable
+              ? previous
+              : String(
+                  page.data[edge === "last" ? page.data.length - 1 : 0]?.id ?? "",
+                );
+          if (next) saveApplication(connectionId, next, page.index);
+          return next;
+        });
       })
       .catch(() => {
         if (!active) return;
@@ -372,6 +425,7 @@ export default function App() {
   function chooseApp(next: string) {
     setCreating(false);
     setAppId(next);
+    saveApplication(connectionId ?? "", next, apps?.index ?? appsIndex);
     setJobsIndex(0);
     setDetail(null);
   }
