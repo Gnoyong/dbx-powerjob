@@ -14,6 +14,7 @@ if (process.platform === "win32") {
 for (const args of [
   ["node_modules/typescript/bin/tsc", "--noEmit"],
   ["node_modules/vite/bin/vite.js", "build", "--configLoader", "runner"],
+  ["scripts/test-ui-bundle.mjs"],
 ]) {
   const result = spawnSync(process.execPath, args, { cwd: root, env, stdio: "inherit" });
   if (result.error) throw result.error;

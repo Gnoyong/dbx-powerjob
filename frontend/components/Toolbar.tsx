@@ -5,6 +5,7 @@ import type { TranslationKey } from "../i18n";
 import type { AppInfo, Page } from "../types";
 import type { T } from "../uiTypes";
 import { Plus } from "lucide-react";
+import type { ReactNode } from "react";
 
 export function Toolbar({
   appId,
@@ -18,6 +19,8 @@ export function Toolbar({
   createDisabled,
   onRefresh,
   t,
+  children,
+  showJobControls = true,
 }: {
   appId: string;
   apps: Page<AppInfo> | null;
@@ -30,6 +33,8 @@ export function Toolbar({
   createDisabled: boolean;
   onRefresh: () => void;
   t: T;
+  children?: ReactNode;
+  showJobControls?: boolean;
 }) {
   const selectedIndex =
     apps?.data.findIndex((app) => String(app.id) === appId) ?? -1;
@@ -57,10 +62,7 @@ export function Toolbar({
             <NativeSelectOption value="">{t(appsStatus)}</NativeSelectOption>
           )}
           {apps?.data.map((app) => (
-            <NativeSelectOption
-              key={app.id}
-              value={app.id}
-            >
+            <NativeSelectOption key={app.id} value={app.id}>
               {label(app.title || app.appName || app.id)}
             </NativeSelectOption>
           ))}
@@ -90,27 +92,28 @@ export function Toolbar({
         </Button>
       </div>
       <div className="toolbar-actions">
-        {/* <span className="readonly">{t("readonly")}</span> */}
-        <Button
-          size="xs"
-          type="button"
-          disabled={createDisabled}
-          onClick={onCreateJob}
-        >
-          <Plus
-            size={14}
-            aria-hidden="true"
-          />{" "}
-          {t("newJob")}
-        </Button>
-        <Button
-          size="xs"
-          type="button"
-          variant="secondary"
-          onClick={onRefresh}
-        >
-          {t("refresh")}
-        </Button>
+        {children}
+        {showJobControls && (
+          <>
+            {/* <span className="readonly">{t("readonly")}</span> */}
+            <Button
+              size="xs"
+              type="button"
+              disabled={createDisabled}
+              onClick={onCreateJob}
+            >
+              <Plus size={14} aria-hidden="true" /> {t("newJob")}
+            </Button>
+            <Button
+              size="xs"
+              type="button"
+              variant="secondary"
+              onClick={onRefresh}
+            >
+              {t("refresh")}
+            </Button>
+          </>
+        )}
       </div>
     </header>
   );

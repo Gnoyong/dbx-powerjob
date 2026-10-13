@@ -89,6 +89,19 @@ func (p *plugin) Handle(_ dbxpluginsdk.RequestContext, method string, params jso
 			return nil, dbxpluginsdk.NewError(-32000, err.Error())
 		}
 		return result, nil
+	case "powerjob/workflowCapabilities", "powerjob/workflows", "powerjob/workflow", "powerjob/workflowInstances", "powerjob/workflowInstance", "powerjob/runWorkflow", "powerjob/setWorkflowEnabled", "powerjob/copyWorkflow", "powerjob/deleteWorkflow", "powerjob/stopWorkflowInstance", "powerjob/retryWorkflowInstance", "powerjob/markWorkflowNodeSuccess", "powerjob/saveWorkflow", "powerjob/workflowSaveStatus":
+		id, _ := values["connectionId"].(string)
+		p.mu.RLock()
+		s := p.sessions[id]
+		p.mu.RUnlock()
+		if s == nil {
+			return nil, dbxpluginsdk.NewError(-32001, "Connection is not active. Reconnect and try again.")
+		}
+		result, err := s.workflow(method, values)
+		if err != nil {
+			return nil, dbxpluginsdk.NewError(-32000, err.Error())
+		}
+		return result, nil
 	case "powerjob/createJob", "powerjob/copyJob", "powerjob/updateJob", "powerjob/setJobEnabled", "powerjob/deleteJob", "powerjob/retryFailedInstance", "powerjob/runJob":
 		id, _ := values["connectionId"].(string)
 		p.mu.RLock()
@@ -110,7 +123,7 @@ func (p *plugin) Handle(_ dbxpluginsdk.RequestContext, method string, params jso
 func main() {
 	metadata := dbxpluginsdk.Metadata{
 		ID:           pluginID,
-		Version:      "0.1.26",
+		Version:      "0.1.29",
 		Capabilities: []string{"connections"},
 	}
 	server := dbxpluginsdk.NewServer(metadata, &plugin{sessions: make(map[string]*session)})

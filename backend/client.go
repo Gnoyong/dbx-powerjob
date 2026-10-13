@@ -14,6 +14,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -33,10 +34,12 @@ type connectionConfig struct {
 }
 
 type session struct {
-	baseURL  string
-	client   *http.Client
-	jwt      string
-	readOnly bool
+	wfMu         sync.Mutex
+	wfOperations *workflowOperations
+	baseURL      string
+	client       *http.Client
+	jwt          string
+	readOnly     bool
 }
 
 type envelope struct {

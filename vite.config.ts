@@ -15,5 +15,8 @@ export default defineConfig({
   build: {
     outDir: "../ui",
     emptyOutDir: true,
+    // DBX embeds the UI in srcdoc with script-src 'unsafe-inline' blob:.
+    // External chunks (including dynamic imports) cannot load in that sandbox.
+    rollupOptions: { output: { inlineDynamicImports: true } },
   },
 });

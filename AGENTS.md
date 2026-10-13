@@ -4,6 +4,13 @@
 
 ## DBX 沙箱交互兼容规范
 
+### 前端必须是单个脚本产物
+
+- DBX 的 srcdoc CSP 只允许内联和 blob 脚本，不能从 HTTP 地址加载额外 JS。
+- 保持 Vite `inlineDynamicImports: true`，不得通过 `React.lazy` 或动态导入产生外部分包。
+- `scripts/build-ui.mjs` 在构建后执行 `scripts/test-ui-bundle.mjs`，确认产物只有一个 JS 且没有外部模块导入。
+- UI 冒烟检查必须在 `sandbox="allow-scripts"` 的 srcdoc iframe 内运行，并使用 `script-src 'unsafe-inline' blob:`。
+
 PowerJob 插件前端运行在受限的 DBX iframe 中。不得假设宿主提供
 `allow-forms` 或 `allow-modals` 权限。任何用户操作都必须在缺少这两个
 权限时正常工作。

@@ -127,6 +127,8 @@ func TestInstanceStatusFilter(t *testing.T) {
 		{"NORMAL", "FAILED"},
 		{"WORKFLOW", "RUNNING"},
 		{"WORKFLOW", "SUCCEED"},
+		{"WORKFLOW", "WAITING_WORKER_RECEIVE"},
+		{"WORKFLOW", "CANCELED"},
 		{"NORMAL", ""},
 	} {
 		_, err := s.read("powerjob/instances", map[string]any{"appId": "2", "jobId": "7", "type": tc.kind, "status": tc.status})
@@ -142,7 +144,7 @@ func TestInstanceStatusFilter(t *testing.T) {
 	}{
 		{"NORMAL", "bogus"},
 		{"NORMAL", "3"},
-		{"WORKFLOW", "CANCELED"},
+		{"WORKFLOW", "WAITING"},
 	} {
 		before := requests
 		if _, err := s.read("powerjob/instances", map[string]any{"appId": "2", "type": tc.kind, "status": tc.status}); err == nil {

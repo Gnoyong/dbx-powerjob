@@ -1,5 +1,10 @@
 import { Button } from "./components/ui/button";
-import { useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { label } from "./format";
 import { getHost, invoke } from "./host";
 import { toast } from "sonner";
@@ -31,6 +36,7 @@ import { InstanceDialog } from "./components/InstanceDialog";
 import { RunJobDialog } from "./components/RunJobDialog";
 import { CreateJobDialog } from "./components/CreateJobDialog";
 import { ConfirmActionDialog } from "./components/ConfirmActionDialog";
+import WorkflowWorkspace from "./workflow/WorkflowWorkspace";
 
 type Tab = "detail" | "runs";
 type Filter = { type: InstanceType; instanceId: string; status: string };
@@ -58,6 +64,23 @@ function actionErrorKey(error: unknown): TranslationKey | null {
 }
 
 export default function App() {
+  const [workspaceMode, setWorkspaceMode] = useState<"tasks" | "workflows">(
+    "tasks",
+  );
+  const workflowNavigation = useRef<((action: () => void) => void) | null>(
+    null,
+  );
+  const registerWorkflowNavigation = useCallback(
+    (guard: ((action: () => void) => void) | null) => {
+      workflowNavigation.current = guard;
+    },
+    [],
+  );
+  function navigateWorkspace(action: () => void) {
+    if (workspaceMode === "workflows" && workflowNavigation.current)
+      workflowNavigation.current(action);
+    else action();
+  }
   const [locale, setLocale] = useState<Locale>("en");
   const t: T = (key, vars) => translate(locale, key, vars);
   const [connectionId, setConnectionId] = useState<string | null>(null);
@@ -106,10 +129,19 @@ export default function App() {
   const actionPending = useRef(false);
   const jobsLayout = useStoredPanelSize(jobsPaneStorageKey, 240);
   useStorageToast("jobs-layout", jobsLayout.failed, jobsLayout.retry, t);
-  function showAction(key: ActionNotificationKey | null, detail?: TranslationKey | null, vars?: Record<string, string | number>) {
+  function showAction(
+    key: ActionNotificationKey | null,
+    detail?: TranslationKey | null,
+    vars?: Record<string, string | number>,
+  ) {
     notifyAction(t, key, detail, vars);
   }
-  useEffect(() => () => { toast.dismiss("powerjob-action"); }, []);
+  useEffect(
+    () => () => {
+      toast.dismiss("powerjob-action");
+    },
+    [],
+  );
   const currentScope = useRef("");
   currentScope.current = `${connectionId}:${appId}`;
   const [appsRefresh, setAppsRefresh] = useState(0);
@@ -293,7 +325,14 @@ export default function App() {
   }, [selectedJobId, appId]);
 
   useEffect(() => {
-    if (tab !== "runs" || !connectionId || !appId || !selectedJobId) return;
+    if (
+      workspaceMode !== "tasks" ||
+      tab !== "runs" ||
+      !connectionId ||
+      !appId ||
+      !selectedJobId
+    )
+      return;
     const activeConnectionId = connectionId;
     let active = true;
     let inFlight = false;
@@ -342,6 +381,7 @@ export default function App() {
     connectionId,
     appId,
     selectedJobId,
+    workspaceMode,
     tab,
     instanceIndex,
     filter,
@@ -725,34 +765,67 @@ export default function App() {
         apps={apps}
         appsLoading={appsLoading}
         appsStatus={appsStatus}
-        onChooseApp={chooseApp}
-        onPreviousApp={() => stepApp(-1)}
-        onNextApp={() => stepApp(1)}
+        onChooseApp={(id) => navigateWorkspace(() => chooseApp(id))}
+        onPreviousApp={() => navigateWorkspace(() => stepApp(-1))}
+        onNextApp={() => navigateWorkspace(() => stepApp(1))}
         onCreateJob={startCreatingJob}
         createDisabled={!connectionId || !appId || actionBusy}
         onRefresh={refreshCurrent}
         t={t}
-      />
-      <span
-        className="sr-only"
-        aria-live="polite"
+        showJobControls={workspaceMode === "tasks"}
       >
+        <Button
+          type="button"
+          size="xs"
+          variant={workspaceMode === "tasks" ? "default" : "secondary"}
+          disabled={actionBusy}
+          onClick={() => navigateWorkspace(() => setWorkspaceMode("tasks"))}
+        >
+          {t("jobs")}
+        </Button>
+        <Button
+          type="button"
+          size="xs"
+          variant={workspaceMode === "workflows" ? "default" : "secondary"}
+          disabled={actionBusy}
+          onClick={() => {
+            setModal(null);
+            setRunTarget(null);
+            setConfirmation(null);
+            setWorkspaceMode("workflows");
+          }}
+        >
+          {t("workflow")}
+        </Button>
+      </Toolbar>
+      <span className="sr-only" aria-live="polite">
         {selectedApp
           ? label(selectedApp.title || selectedApp.appName)
           : t(appsStatus)}
       </span>
       {message && (
-        <div
-          role="status"
-          className="message"
-        >
+        <div role="status" className="message">
           {t(message)}
         </div>
       )}
 
-
       <main className="workspace">
-        {!jobsLayout.ready ? (
+        {workspaceMode === "workflows" ? (
+          connectionId && appId ? (
+            <>
+              <WorkflowWorkspace
+                key={`${connectionId}:${appId}`}
+                connectionId={connectionId}
+                appId={appId}
+                locale={locale}
+                t={t}
+                registerNavigation={registerWorkflowNavigation}
+              />
+            </>
+          ) : (
+            <p>{t("selectConnection")}</p>
+          )
+        ) : !jobsLayout.ready ? (
           <div role="status">{t("loading")}</div>
         ) : (
           <ResizablePanelGroup
@@ -793,10 +866,7 @@ export default function App() {
                 t={t}
               />
             </ResizablePanel>
-            <ResizableHandle
-              withHandle
-              aria-label={t("resizeJobsPane")}
-            />
+            <ResizableHandle withHandle aria-label={t("resizeJobsPane")} />
             <ResizablePanel
               id="details-panel"
               className="workspace-panel"
@@ -808,10 +878,7 @@ export default function App() {
                 aria-label={t("jobWorkspace")}
               >
                 <div className="detail-bar">
-                  <nav
-                    className="detail-tabs"
-                    aria-label={t("jobInfo")}
-                  >
+                  <nav className="detail-tabs" aria-label={t("jobInfo")}>
                     <Button
                       type="button"
                       className={tab === "detail" ? "active" : ""}

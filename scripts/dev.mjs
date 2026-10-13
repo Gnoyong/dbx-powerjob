@@ -1,13 +1,20 @@
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path, { delimiter } from "node:path";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const cli = path.join(root, "node_modules", "@dbx-app", "plugin-cli", "bin", "dbx-plugin.js");
 const env = { ...process.env };
+env.GOCACHE = path.join(root, "backend", ".go-cache");
+mkdirSync(env.GOCACHE, { recursive: true });
 
 if (process.platform === "win32") {
+  // Go compilation happens before ui_build, so its temp directory must be
+  // configured here rather than only in the frontend build script.
+  const temp = path.join(root, ".dbx-dev", "tmp");
+  mkdirSync(temp, { recursive: true });
+  Object.assign(env, { TEMP: temp, TMP: temp, TMPDIR: temp, GOTMPDIR: temp });
   const pathKey = Object.keys(env).find(key => key.toLowerCase() === "path") ?? "Path";
   const goBinCandidates = [
     env.ProgramFiles && path.join(env.ProgramFiles, "Go", "bin"),
@@ -33,10 +40,7 @@ if (go.status !== 0) {
 
 const child = spawn(process.execPath, [cli, "dev", "--path", root, "--port", "15190"], {
   cwd: root,
-  env: {
-    ...env,
-    GOCACHE: path.join(root, "backend", ".go-cache"),
-  },
+  env,
   stdio: "inherit",
 });
 

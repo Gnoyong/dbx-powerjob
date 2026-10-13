@@ -1,6 +1,26 @@
 import type { AppInfo, Instance, Job, JobDetail, LogPage, Page } from "./types";
+import type {
+  WorkflowDefinition,
+  WorkflowInstance,
+  SaveOperation,
+  WorkflowActionResult,
+} from "./workflow/types";
 
 type MethodResult = {
+  "powerjob/workflowCapabilities": { readOnly: boolean };
+  "powerjob/workflows": Page<WorkflowDefinition>;
+  "powerjob/workflow": WorkflowDefinition;
+  "powerjob/workflowInstances": Page<WorkflowInstance>;
+  "powerjob/workflowInstance": WorkflowInstance;
+  "powerjob/saveWorkflow": SaveOperation;
+  "powerjob/workflowSaveStatus": SaveOperation;
+  "powerjob/runWorkflow": { wfInstanceId: string };
+  "powerjob/setWorkflowEnabled": WorkflowDefinition;
+  "powerjob/copyWorkflow": WorkflowDefinition;
+  "powerjob/deleteWorkflow": WorkflowActionResult;
+  "powerjob/stopWorkflowInstance": WorkflowActionResult;
+  "powerjob/retryWorkflowInstance": WorkflowActionResult;
+  "powerjob/markWorkflowNodeSuccess": WorkflowActionResult;
   "powerjob/apps": Page<AppInfo>;
   "powerjob/jobs": Page<Job>;
   "powerjob/job": JobDetail;
@@ -28,11 +48,17 @@ type Host = {
   locale?: string;
   context?: Context;
   onContext(callback: (context: Context) => void): (() => void) | void;
-  invoke(method: string, params: Record<string, unknown>, options: { timeoutMs: number }): Promise<unknown>;
+  invoke(
+    method: string,
+    params: Record<string, unknown>,
+    options: { timeoutMs: number },
+  ): Promise<unknown>;
 };
 
 declare global {
-  interface Window { dbxPlugin?: Host }
+  interface Window {
+    dbxPlugin?: Host;
+  }
 }
 
 export function getHost(): Host {
@@ -47,14 +73,22 @@ async function getStorage() {
   return host.capabilities?.storage ? host.storage : undefined;
 }
 
-export async function readPanelSize(key: string, minimum: number): Promise<number | null> {
+export async function readPanelSize(
+  key: string,
+  minimum: number,
+): Promise<number | null> {
   const storage = await getStorage();
   if (!storage) return null;
   const value = await storage.get(key);
-  return typeof value === "number" && Number.isFinite(value) && value >= minimum ? value : null;
+  return typeof value === "number" && Number.isFinite(value) && value >= minimum
+    ? value
+    : null;
 }
 
-export async function writePanelSize(key: string, value: number): Promise<void> {
+export async function writePanelSize(
+  key: string,
+  value: number,
+): Promise<void> {
   const storage = await getStorage();
   if (storage) await storage.set(key, Math.round(value));
 }
@@ -64,5 +98,9 @@ export function invoke<K extends keyof MethodResult>(
   method: K,
   params: Record<string, unknown> = {},
 ): Promise<MethodResult[K]> {
-  return getHost().invoke(method, { connectionId, ...params }, { timeoutMs: 30000 }) as Promise<MethodResult[K]>;
+  return getHost().invoke(
+    method,
+    { connectionId, ...params },
+    { timeoutMs: 30000 },
+  ) as Promise<MethodResult[K]>;
 }
