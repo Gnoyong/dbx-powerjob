@@ -5,10 +5,7 @@
       "label": "检查 TypeScript",
       "type": "shell",
       "command": "pnpm",
-      "args": [
-        "run",
-        "typecheck"
-      ],
+      "args": ["run", "typecheck"],
       "options": {
         "cwd": "${workspaceFolder}"
       },
@@ -18,10 +15,7 @@
       "label": "构建插件前端",
       "type": "shell",
       "command": "pnpm",
-      "args": [
-        "run",
-        "build"
-      ],
+      "args": ["run", "build"],
       "options": {
         "cwd": "${workspaceFolder}"
       },
@@ -50,18 +44,12 @@
       "label": "发布新版本",
       "type": "process",
       "command": "node",
-      "args": [
-        "scripts/release.mjs",
-        "${input:releaseVersion}"
-      ],
+      "args": ["scripts/release.mjs", "${input:releaseVersion}"],
       "options": {
         "cwd": "${workspaceFolder}"
       },
       "dependsOrder": "sequence",
-      "dependsOn": [
-        "检查 TypeScript",
-        "构建插件前端"
-      ],
+      "dependsOn": ["检查 TypeScript", "构建插件前端"],
       "problemMatcher": []
     }
   ],
@@ -70,7 +58,7 @@
       "id": "releaseVersion",
       "type": "promptString",
       "description": "请输入新版本号（不含 v）",
-      "default": "0.1.26"
+      "default": "0.1.27"
     }
   ]
 }

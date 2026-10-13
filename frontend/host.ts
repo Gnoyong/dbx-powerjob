@@ -73,6 +73,52 @@ async function getStorage() {
   return host.capabilities?.storage ? host.storage : undefined;
 }
 
+export type SavedApplication = { appId: string; pageIndex: number };
+
+function applicationStorageKey(connectionId: string): string {
+  return `local.powerjob.readonly.last-application:${connectionId}`;
+}
+
+export async function readSavedApplication(connectionId: string): Promise<SavedApplication | null> {
+  const storage = await getStorage();
+  if (!storage) return null;
+  const value = await storage.get(applicationStorageKey(connectionId));
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const saved = value as Partial<SavedApplication>;
+  return typeof saved.appId === "string" && saved.appId.length > 0 &&
+    typeof saved.pageIndex === "number" && Number.isInteger(saved.pageIndex) && saved.pageIndex >= 0
+    ? { appId: saved.appId, pageIndex: saved.pageIndex }
+    : null;
+}
+
+export async function writeSavedApplication(connectionId: string, selection: SavedApplication): Promise<void> {
+  const storage = await getStorage();
+  if (storage) await storage.set(applicationStorageKey(connectionId), selection);
+}
+
+export type SavedApplication = { appId: string; pageIndex: number };
+
+function applicationStorageKey(connectionId: string): string {
+  return `local.powerjob.readonly.last-application:${connectionId}`;
+}
+
+export async function readSavedApplication(connectionId: string): Promise<SavedApplication | null> {
+  const storage = await getStorage();
+  if (!storage) return null;
+  const value = await storage.get(applicationStorageKey(connectionId));
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const saved = value as Partial<SavedApplication>;
+  return typeof saved.appId === "string" && saved.appId.length > 0 &&
+    typeof saved.pageIndex === "number" && Number.isInteger(saved.pageIndex) && saved.pageIndex >= 0
+    ? { appId: saved.appId, pageIndex: saved.pageIndex }
+    : null;
+}
+
+export async function writeSavedApplication(connectionId: string, selection: SavedApplication): Promise<void> {
+  const storage = await getStorage();
+  if (storage) await storage.set(applicationStorageKey(connectionId), selection);
+}
+
 export async function readPanelSize(
   key: string,
   minimum: number,
