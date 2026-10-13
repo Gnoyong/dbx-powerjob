@@ -75,7 +75,7 @@ test("application selection ignores malformed host data", async () => {
 });
 
 test("sandbox UI uses no browser persistence and manifest grants host storage", () => {
-  for (const file of ["App.tsx", "components/RunsPane.tsx"]) {
+  for (const file of ["App.tsx", "hooks/useApplications.ts", "tasks/TaskWorkspace.tsx", "components/RunsPane.tsx"]) {
     assert.doesNotMatch(readFileSync(new URL(`../frontend/${file}`, import.meta.url), "utf8"), /localStorage|sessionStorage|indexedDB/);
   }
   const manifest = JSON.parse(readFileSync(new URL("../manifest.json", import.meta.url), "utf8"));

@@ -8,6 +8,9 @@ const assert = require("node:assert/strict");
   const browser = await chromium.launch({
     headless: true,
     executablePath: process.argv[3],
+    // Avoid a separate opaque-origin renderer in the restricted Windows test environment.
+    // This does not change the iframe sandbox or CSP.
+    args: ["--disable-site-isolation-trials"],
   });
   try {
     const context = await browser.newContext({
@@ -256,8 +259,9 @@ const assert = require("node:assert/strict");
         },
       };
     });
+    const initialFrame = browserPage.waitForEvent("framenavigated", { predicate: frame => frame.url() === "about:srcdoc" });
     await browserPage.goto("http://localhost:15191/");
-    page = browserPage.frames().find(frame => frame.url() === "about:srcdoc");
+    page = await initialFrame;
     assert(page, "sandbox iframe did not load");
     await page.getByRole("button", { name: "工作流", exact: true }).click();
     await page.getByRole("button", { name: /演示流程/ }).click();
@@ -425,8 +429,9 @@ const assert = require("node:assert/strict");
     await browserPage.addInitScript(() => {
       window.__readOnly = true;
     });
+    const reloadedFrame = browserPage.waitForEvent("framenavigated", { predicate: frame => frame.url() === "about:srcdoc" });
     await browserPage.reload();
-    page = browserPage.frames().find(frame => frame.url() === "about:srcdoc");
+    page = await reloadedFrame;
     await page.getByRole("button", { name: "工作流", exact: true }).click();
     await page.getByText("只读连接", { exact: true }).waitFor();
     assert.equal(

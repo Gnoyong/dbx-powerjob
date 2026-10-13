@@ -1,7 +1,7 @@
 {
   "name": "dbx-powerjob-ui",
   "private": true,
-  "version": "0.1.29",
+  "version": "0.1.30",
   "packageManager": "pnpm@11.9.0",
   "type": "module",
   "scripts": {
@@ -9,7 +9,8 @@
     "build": "node scripts/build-ui.mjs",
     "build:watch": "node scripts/watch-ui.mjs",
     "typecheck": "tsc --noEmit",
-    "test:workflow": "node scripts/test-workflow.mjs"
+    "test:workflow": "node scripts/test-workflow.mjs",
+    "test:tasks": "node --test scripts/task-contract.test.mjs scripts/action-gate.test.mjs"
   },
   "dependencies": {
     "@dagrejs/dagre": "^3.1.1",
