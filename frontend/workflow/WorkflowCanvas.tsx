@@ -1,4 +1,12 @@
-import { memo, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { toast } from "sonner";
 import {
   ReactFlow,
@@ -41,7 +49,10 @@ const WorkflowGraphNode = memo(function WorkflowGraphNode({
     <div
       className={`wf-node wf-node-${tone}${selected ? " wf-node-selected" : ""}`}
     >
-      <Handle type="target" position={Position.Left} />
+      <Handle
+        type="target"
+        position={Position.Left}
+      />
       <small>
         {w(
           n.nodeType === 2 ? "decision" : n.nodeType === 3 ? "nested" : "task",
@@ -77,7 +88,10 @@ const WorkflowGraphNode = memo(function WorkflowGraphNode({
           <label className="wf-port-false">N</label>
         </>
       ) : (
-        <Handle type="source" position={Position.Right} />
+        <Handle
+          type="source"
+          position={Position.Right}
+        />
       )}
     </div>
   );
@@ -129,7 +143,12 @@ export function WorkflowCanvas({
   const [storageFailed, setStorageFailed] = useState(false);
   const storageToastId = useId();
   const edgeToastId = useId();
-  useEffect(() => () => { toast.dismiss(edgeToastId); }, [edgeToastId]);
+  useEffect(
+    () => () => {
+      toast.dismiss(edgeToastId);
+    },
+    [edgeToastId],
+  );
   const flow = useRef<ReactFlowInstance<FlowNode, Edge> | null>(null);
   const loaded = useRef(false);
   const generation = useRef(0);
@@ -278,7 +297,9 @@ export function WorkflowCanvas({
     } else {
       toast.dismiss(storageToastId);
     }
-    return () => { toast.dismiss(storageToastId); };
+    return () => {
+      toast.dismiss(storageToastId);
+    };
   }, [storageFailed, storageToastId, locale, persist]);
   function layout(direction: "LR" | "TB") {
     const arranged = arrangeDraft(draft, direction);
@@ -298,7 +319,10 @@ export function WorkflowCanvas({
     });
   }
   return (
-    <section className="wf-canvas-section" aria-label={w("definitions")}>
+    <section
+      className="wf-canvas-section"
+      aria-label={w("definitions")}
+    >
       <div className="wf-canvas-toolbar">
         {toolbar}
         <div className="wf-toolbar-group">
@@ -308,7 +332,7 @@ export function WorkflowCanvas({
             variant="secondary"
             onClick={() => layout("LR")}
           >
-            {w("layout")} · {w("horizontal")}
+            {w("horizontal")}
           </Button>
           <Button
             type="button"
@@ -449,7 +473,10 @@ export function WorkflowCanvas({
         >
           <Background gap={20} />
           <Controls showInteractive={false} />
-          <MiniMap pannable zoomable />
+          <MiniMap
+            pannable
+            zoomable
+          />
         </ReactFlow>
       </div>
     </section>

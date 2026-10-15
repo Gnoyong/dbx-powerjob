@@ -733,7 +733,52 @@ input[data-slot="input"][aria-invalid="true"] {
 
 .jobs-list {
   flex: 1 1 auto;
+  min-height: 0;
   overflow: auto;
+}
+
+.list-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 100%;
+  padding: 28px 16px;
+  color: var(--color-muted-foreground, #677282);
+  text-align: center;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.list-placeholder-icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 4px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--color-primary, #3565c8) 8%, var(--color-background, #fff));
+  color: var(--color-primary, #3565c8);
+}
+
+.list-placeholder-icon-loading svg {
+  animation: job-instance-spin 1s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .list-placeholder-icon-loading svg { animation: none; }
+}
+
+.list-placeholder strong {
+  color: var(--color-foreground, #202631);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.list-placeholder > span:last-child:not(.list-placeholder-icon) {
+  max-width: 220px;
 }
 
 .job-item-wrap {

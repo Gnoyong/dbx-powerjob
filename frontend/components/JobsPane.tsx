@@ -8,6 +8,7 @@ import { JobInstanceStatusIcon } from "./JobInstanceStatusIcon";
 import type { Job, Page } from "../types";
 import type { T } from "../uiTypes";
 import { Pager } from "./Pager";
+import { ListPlaceholder } from "./ListPlaceholder";
 
 type JobMenu = { job: Job; x: number; y: number };
 
@@ -145,7 +146,11 @@ export function JobsPane({
         aria-label={t("jobs")}
       >
         {loading || !jobs?.data.length ? (
-          <div className="empty-pane">{t(status)}</div>
+          <ListPlaceholder
+            title={t(status)}
+            description={!loading && status === "noJobs" ? t("emptyListHint") : undefined}
+            state={loading ? "loading" : status === "noJobs" ? "empty" : "error"}
+          />
         ) : (
           jobs.data.map((job) => (
             <div
@@ -280,11 +285,7 @@ export function JobsPane({
           </Button>
         </div>
       )}
-      <Pager
-        page={jobs}
-        onPage={onPage}
-        t={t}
-      />
+      {!!jobs?.totalPages && <Pager page={jobs} onPage={onPage} t={t} />}
     </section>
   );
 }

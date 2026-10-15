@@ -230,7 +230,11 @@ export function WorkflowEditor({
     const issues = draftErrors(draft);
     if (issues.length) {
       toast.error(w(issues[0] as WorkflowTextKey), {
-        description: issues.slice(1).map((key) => w(key as WorkflowTextKey)).join("\n") || undefined,
+        description:
+          issues
+            .slice(1)
+            .map((key) => w(key as WorkflowTextKey))
+            .join("\n") || undefined,
         duration: 8000,
         closeButton: true,
       });
@@ -250,7 +254,11 @@ export function WorkflowEditor({
     setError("");
     setOperation(null);
     setRecoverToken("");
-    toast.loading(w("saving"), { id: saveToastId, duration: Infinity, closeButton: false });
+    toast.loading(w("saving"), {
+      id: saveToastId,
+      duration: Infinity,
+      closeButton: false,
+    });
     const operationId = crypto.randomUUID();
     // Persist intent before starting any write so a reload can recover a lost RPC response.
     try {
@@ -333,7 +341,8 @@ export function WorkflowEditor({
       readOnly ||
       !operation ||
       !["partial", "unverified"].includes(operation.state)
-    ) return;
+    )
+      return;
     submitting.current = true;
     setStarting(true);
     setError("");
@@ -357,7 +366,11 @@ export function WorkflowEditor({
   }
   useEffect(() => {
     if (starting && !operation) {
-      toast.loading(w("saving"), { id: saveToastId, duration: Infinity, closeButton: false });
+      toast.loading(w("saving"), {
+        id: saveToastId,
+        duration: Infinity,
+        closeButton: false,
+      });
     } else if (!operation && !recoverToken) {
       toast.dismiss(saveToastId);
     } else if (!operation) {
@@ -375,17 +388,30 @@ export function WorkflowEditor({
         },
       });
     } else if (operation.state === "running") {
-      toast.loading(w(operation.stage), { id: saveToastId, duration: Infinity, closeButton: false });
+      toast.loading(w(operation.stage), {
+        id: saveToastId,
+        duration: Infinity,
+        closeButton: false,
+      });
     } else if (operation.state === "succeeded") {
-      toast.success(w("succeeded"), { id: saveToastId, duration: 4000, closeButton: true });
+      toast.success(w("succeeded"), {
+        id: saveToastId,
+        duration: 4000,
+        closeButton: true,
+      });
     } else {
       const mapping = Object.entries(operation.nodeIds)
         .map(([draftId, savedId]) => `${draftId} → ${savedId}`)
         .join(", ");
-      const description = [operation.error, unresolved ? w("partialWarning") : "", mapping ? `${w("nodeMapping")}: ${mapping}` : ""]
+      const description = [
+        operation.error,
+        unresolved ? w("partialWarning") : "",
+        mapping ? `${w("nodeMapping")}: ${mapping}` : "",
+      ]
         .filter(Boolean)
         .join("\n");
-      const canResume = !readOnly && ["partial", "unverified"].includes(operation.state);
+      const canResume =
+        !readOnly && ["partial", "unverified"].includes(operation.state);
       toast[unresolved ? "warning" : "error"](w(operation.state), {
         id: saveToastId,
         description,
@@ -393,28 +419,46 @@ export function WorkflowEditor({
         closeButton: !unresolved,
         dismissible: !unresolved,
         action: canResume
-          ? { label: w("resume"), onClick: (event) => {
-              event.preventDefault();
-              void resumeOperation();
-            } }
-          : unresolved
-            ? { label: w("clearRecord"), onClick: (event) => {
+          ? {
+              label: w("resume"),
+              onClick: (event) => {
                 event.preventDefault();
-                if (!busy) setClearRecord(true);
-              } }
+                void resumeOperation();
+              },
+            }
+          : unresolved
+            ? {
+                label: w("clearRecord"),
+                onClick: (event) => {
+                  event.preventDefault();
+                  if (!busy) setClearRecord(true);
+                },
+              }
             : undefined,
         cancel: canResume
-          ? { label: w("clearRecord"), onClick: (event) => {
-              event.preventDefault();
-              if (!busy) setClearRecord(true);
-            } }
+          ? {
+              label: w("clearRecord"),
+              onClick: (event) => {
+                event.preventDefault();
+                if (!busy) setClearRecord(true);
+              },
+            }
           : undefined,
       });
     }
     return () => {
       if (operation?.state !== "succeeded") toast.dismiss(saveToastId);
     };
-  }, [operation, recoverToken, readOnly, busy, starting, locale, saveToastId, unresolved]);
+  }, [
+    operation,
+    recoverToken,
+    readOnly,
+    busy,
+    starting,
+    locale,
+    saveToastId,
+    unresolved,
+  ]);
   return (
     <div className="wf-editor">
       <div className="wf-editor-toolbar">
@@ -459,7 +503,10 @@ export function WorkflowEditor({
           </>
         )}
       </div>
-      <section className="wf-definition-config" aria-label={w("definitions")}>
+      <section
+        className="wf-definition-config"
+        aria-label={w("definitions")}
+      >
         <div className="flex">
           <Button
             type="button"
@@ -471,9 +518,15 @@ export function WorkflowEditor({
             onClick={() => setConfigExpanded((value) => !value)}
           >
             {configExpanded ? (
-              <ChevronDown data-icon="inline-start" aria-hidden="true" />
+              <ChevronDown
+                data-icon="inline-start"
+                aria-hidden="true"
+              />
             ) : (
-              <ChevronRight data-icon="inline-start" aria-hidden="true" />
+              <ChevronRight
+                data-icon="inline-start"
+                aria-hidden="true"
+              />
             )}
             {w("definitions")}
           </Button>
@@ -638,7 +691,10 @@ export function WorkflowEditor({
             className="wf-editor-split"
             onLayoutChanged={inspectorLayout.onLayoutChanged}
           >
-            <ResizablePanel id="workflow-graph-panel" minSize={320}>
+            <ResizablePanel
+              id="workflow-graph-panel"
+              minSize={320}
+            >
               <div className="wf-editor-graph">
                 <WorkflowCanvas
                   toolbar={
@@ -659,7 +715,6 @@ export function WorkflowEditor({
                             setSelected(node.key);
                           }}
                         >
-                          {w("add")} ·{" "}
                           {w(
                             kind === 1
                               ? "task"
@@ -681,7 +736,10 @@ export function WorkflowEditor({
                 />
               </div>
             </ResizablePanel>
-            <ResizableHandle withHandle aria-label={w("resizeInspector")} />
+            <ResizableHandle
+              withHandle
+              aria-label={w("resizeInspector")}
+            />
             <ResizablePanel
               id="workflow-inspector-panel"
               minSize={220}
@@ -742,7 +800,12 @@ export function WorkflowEditor({
         )}
       </div>
       {clearRecord && (
-        <Dialog open onOpenChange={(open) => { if (!clearing.current) setClearRecord(open); }}>
+        <Dialog
+          open
+          onOpenChange={(open) => {
+            if (!clearing.current) setClearRecord(open);
+          }}
+        >
           <DialogContent className="confirm-action-dialog">
             <DialogTitle>{w("clearRecord")}</DialogTitle>
             <p>{w("clearWarning")}</p>
@@ -787,7 +850,10 @@ export function WorkflowEditor({
                       setClearRecord(false);
                       setUndo([]);
                       setRedo([]);
-                      toast.success(w("clearRecord"), { duration: 4000, closeButton: true });
+                      toast.success(w("clearRecord"), {
+                        duration: 4000,
+                        closeButton: true,
+                      });
                     } catch (e) {
                       setError(String(e));
                     } finally {

@@ -6,6 +6,7 @@ import { Input } from "../components/ui/input";
 import { Dialog, DialogContent, DialogTitle } from "../components/ui/dialog";
 import { ConfirmActionDialog } from "../components/ConfirmActionDialog";
 import { Pager } from "../components/Pager";
+import { ListPlaceholder } from "../components/ListPlaceholder";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -440,10 +441,14 @@ export default function WorkflowWorkspace({
                     </div>
                   ))}
                   {!page?.data.length && (
-                    <p>{w(loading ? "loading" : "empty")}</p>
+                    <ListPlaceholder
+                      title={w(loading ? "loading" : error && !page ? "listLoadFailed" : "empty")}
+                      description={!loading && page ? w("emptyListHint") : undefined}
+                      state={loading ? "loading" : error && !page ? "error" : "empty"}
+                    />
                   )}
                 </div>
-                <Pager page={page} onPage={setIndex} t={t} />
+                {!!page?.totalPages && <Pager page={page} onPage={setIndex} t={t} />}
               </aside>
             </ResizablePanel>
             <ResizableHandle withHandle aria-label={w("resizeList")} />
