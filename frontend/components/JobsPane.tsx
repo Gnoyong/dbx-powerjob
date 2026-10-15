@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { label } from "../format";
-import type { TranslationKey } from "../i18n";
+import type { Locale, TranslationKey } from "../i18n";
+import type { LatestJobInstanceMap } from "../tasks/useLatestJobInstances";
+import { InstanceStatusBadge } from "./InstanceStatusBadge";
 import type { Job, Page } from "../types";
 import type { T } from "../uiTypes";
 import { Pager } from "./Pager";
@@ -11,6 +13,8 @@ type JobMenu = { job: Job; x: number; y: number };
 
 export function JobsPane({
   jobs,
+  latestInstances,
+  locale,
   loading,
   status,
   draftKeyword,
@@ -27,6 +31,8 @@ export function JobsPane({
   t,
 }: {
   jobs: Page<Job> | null;
+  latestInstances: LatestJobInstanceMap;
+  locale: Locale;
   loading: boolean;
   status: TranslationKey;
   draftKeyword: string;
@@ -201,6 +207,17 @@ export function JobsPane({
                   >
                     {job.enable ? t("enabled") : t("disabled")}
                   </span>
+                </span>
+                <span className="job-latest-instance">
+                  <span>{t("latestInstance")}</span>
+                  {latestInstances[job.id]?.instance ? (
+                    <InstanceStatusBadge value={latestInstances[job.id]!.instance!.status} type="NORMAL" locale={locale} />
+                  ) : (
+                    <span>{t(!latestInstances[job.id] ? "loading" : latestInstances[job.id]?.error ? "latestInstanceFailed" : "noInstanceRecords")}</span>
+                  )}
+                  {latestInstances[job.id]?.instance && latestInstances[job.id]?.error && (
+                    <span className="job-latest-error">{t("latestInstanceUpdateFailed")}</span>
+                  )}
                 </span>
               </Button>
             </div>

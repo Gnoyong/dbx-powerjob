@@ -617,6 +617,7 @@ input[data-slot="input"][aria-invalid="true"] {
 
 .job-item {
   display: flex;
+  height: auto;
   flex-direction: column;
   gap: 3px;
   width: 100%;
@@ -715,6 +716,20 @@ input[data-slot="input"][aria-invalid="true"] {
 }
 
 .job-enable-status--disabled {
+  color: var(--color-destructive, #a3312a);
+}
+
+.job-latest-instance {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 7px;
+  width: 100%;
+  color: var(--color-muted-foreground, #677282);
+  font-size: 11px;
+}
+
+.job-latest-error {
   color: var(--color-destructive, #a3312a);
 }
 

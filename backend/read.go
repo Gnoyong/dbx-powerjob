@@ -24,6 +24,8 @@ func (s *session) read(method string, params map[string]any) (any, error) {
 		return nil, err
 	}
 	switch method {
+	case "powerjob/latestJobInstances":
+		return s.latestJobInstances(params)
 	case "powerjob/apps":
 		body := map[string]any{"showMyRelated": true, "index": index, "pageSize": size}
 		return s.page("/appInfo/list", "", body, appFields)

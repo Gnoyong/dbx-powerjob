@@ -1,5 +1,7 @@
 export const dictionaries = {
   en: {
+    latestInstance: "Latest instance", noInstanceRecords: "No instance records",
+    latestInstanceFailed: "Query failed", latestInstanceUpdateFailed: "Update failed",
     layoutStorageFailed: "Could not restore or save the panel layout. Please retry.",
     applicationStorageFailed: "Could not restore or save the last selected application.",
     notifications: "Notifications",
@@ -65,6 +67,8 @@ export const dictionaries = {
     gmtCreate: "Created at", gmtModified: "Modified at",
   },
   "zh-CN": {
+    latestInstance: "最新实例", noInstanceRecords: "无实例记录",
+    latestInstanceFailed: "查询失败", latestInstanceUpdateFailed: "更新失败",
     layoutStorageFailed: "面板布局读取或保存失败，请重试。",
     applicationStorageFailed: "上次选择的应用读取或保存失败。",
     notifications: "通知",

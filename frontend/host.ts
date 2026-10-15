@@ -1,4 +1,4 @@
-import type { AppInfo, Instance, Job, JobDetail, LogPage, Page } from "./types";
+import type { AppInfo, Instance, Job, JobDetail, LatestJobInstance, LogPage, Page } from "./types";
 import type {
   WorkflowDefinition,
   WorkflowInstance,
@@ -25,6 +25,7 @@ type MethodResult = {
   "powerjob/jobs": Page<Job>;
   "powerjob/job": JobDetail;
   "powerjob/instances": Page<Instance>;
+  "powerjob/latestJobInstances": { data: LatestJobInstance[] };
   "powerjob/instance": Record<string, unknown>;
   "powerjob/log": LogPage;
   "powerjob/setJobEnabled": { success: boolean };

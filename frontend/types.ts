@@ -35,3 +35,9 @@ export type LogPage = {
   totalPages: number;
   data: string;
 };
+
+export type LatestJobInstance = {
+  jobId: string;
+  instance: Instance | null;
+  error?: string;
+};

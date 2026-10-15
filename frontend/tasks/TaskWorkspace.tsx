@@ -19,6 +19,7 @@ import { useJobs } from "./useJobs";
 import { useJobDetail } from "./useJobDetail";
 import { useInstances } from "./useInstances";
 import { useJobActions } from "./useJobActions";
+import { useLatestJobInstances } from "./useLatestJobInstances";
 
 type Confirmation =
   | { kind: "jobEnabled"; job: Job; enabled: boolean }
@@ -40,6 +41,7 @@ export function TaskWorkspace({ connectionId, appId, locale, t, visible, ref, on
   const jobsState = useJobs(connectionId, appId);
   const { jobs, jobsStatus, jobsLoading, draftKeyword, setDraftKeyword, selectedJobId,
     selectedJob, searchJobs, pageJobs, refresh } = jobsState;
+  const latestInstances = useLatestJobInstances(connectionId, appId, jobs, visible && !jobsLoading);
   const { detail, detailStatus } = useJobDetail(connectionId, appId, selectedJobId, refresh);
   const runs = useInstances(connectionId, appId, selectedJobId, visible && tab === "runs");
   const { instances, instancesStatus, instancesLoading, draftInstanceId, setDraftInstanceId,
@@ -155,6 +157,7 @@ export function TaskWorkspace({ connectionId, appId, locale, t, visible, ref, on
       setRunTarget(null);
       jobsState.selectJob(String(job.id));
       runs.showNormalRuns();
+      latestInstances.refresh(String(job.id));
       setTab("runs");
     } else if (result.status === "failed") setRunError(result.error ?? "runJobFailed");
   }
@@ -167,6 +170,7 @@ export function TaskWorkspace({ connectionId, appId, locale, t, visible, ref, on
     if (result.status === "success") {
       setModal(null);
       runs.refreshInstances();
+      latestInstances.refresh(jobId);
     }
   }
 
@@ -192,6 +196,8 @@ export function TaskWorkspace({ connectionId, appId, locale, t, visible, ref, on
         >
           <JobsPane
             jobs={jobs}
+            latestInstances={latestInstances.rows}
+            locale={locale}
             loading={jobsLoading}
             status={jobsStatus}
             draftKeyword={draftKeyword}

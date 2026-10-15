@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"errors"
@@ -34,6 +35,8 @@ type connectionConfig struct {
 }
 
 type session struct {
+	latestMu     sync.Mutex
+	latestSlots  chan struct{}
 	wfMu         sync.Mutex
 	wfOperations *workflowOperations
 	baseURL      string
@@ -167,6 +170,10 @@ func login(cfg connectionConfig) (*session, error) {
 
 // request is private to this file. No RPC method can choose an HTTP path or method.
 func (s *session) request(method, path, appID string, query url.Values, body any) (json.RawMessage, error) {
+	return s.requestContext(context.Background(), method, path, appID, query, body)
+}
+
+func (s *session) requestContext(ctx context.Context, method, path, appID string, query url.Values, body any) (json.RawMessage, error) {
 	u := s.baseURL + path
 	if len(query) > 0 {
 		u += "?" + query.Encode()
@@ -179,7 +186,7 @@ func (s *session) request(method, path, appID string, query url.Values, body any
 		}
 		payload = bytes.NewReader(encoded)
 	}
-	req, err := http.NewRequest(method, u, payload)
+	req, err := http.NewRequestWithContext(ctx, method, u, payload)
 	if err != nil {
 		return nil, errors.New("invalid request")
 	}

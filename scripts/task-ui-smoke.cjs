@@ -14,6 +14,7 @@ const assert = require("node:assert/strict");
   });
   try {
     const outer = await browser.newPage({ viewport: { width: 1450, height: 950 } });
+    if (process.argv.includes("--latest-only")) await outer.clock.install();
     outer.setDefaultTimeout(10000);
     const failures = [];
     outer.on("pageerror", error => failures.push(String(error)));
@@ -67,6 +68,7 @@ const assert = require("node:assert/strict");
               timeExpressionType: "API", timeExpression: "", executeType: "STANDALONE", processorType: "BUILT_IN", processorInfo: "demo.Processor",
             };
             case "powerjob/instances": return page([{ instanceId: "9007199254740993", status: 4 }]);
+            case "powerjob/latestJobInstances": return { data: params.jobIds.map(jobId => window.__latest?.[jobId] ?? ({ jobId, instance: jobId === "7" ? { instanceId: "9007199254740993", status: 3 } : null })) };
             case "powerjob/instance": return { status: 4, result: "failed" };
             case "powerjob/log": return { index: 0, totalPages: 1, data: "mock log\n" };
             case "powerjob/setJobEnabled": jobs.find(job => job.id === params.jobId).enable = params.enabled; return { success: true };
@@ -93,6 +95,12 @@ const assert = require("node:assert/strict");
     const button = name => frame.getByRole("button", { name, exact: true });
     await frame.waitForFunction(() => document.querySelector("#app-select")?.value === "4");
     await frame.locator(".job-item").first().waitFor();
+    await frame.locator(".job-item").filter({ hasText: "Alpha" }).getByText("Running", { exact: true }).waitFor();
+    await frame.locator(".job-item").filter({ hasText: "Beta" }).getByText("No instance records", { exact: true }).waitFor();
+    if (process.argv.includes("--latest-only")) {
+      await require("./latest-instances-smoke.cjs")({ outer, frame, calls, button, menu, failures });
+      return;
+    }
     assert.equal((await calls("powerjob/apps"))[0].params.index, 1);
     await button("Previous application").click();
     await frame.waitForFunction(() => document.querySelector("#app-select").value === "3");
@@ -152,12 +160,16 @@ const assert = require("node:assert/strict");
     assert.equal(await frame.locator("#instance-type").inputValue(), "NORMAL");
     assert.equal(await frame.locator("#instance-id").inputValue(), "");
     assert.equal((await calls("powerjob/runJob")).at(-1).params.instanceParams, "payload");
+    await frame.waitForFunction(() => window.__calls.some(call => call.method === "powerjob/latestJobInstances" && call.params.jobIds.length === 1 && call.params.jobIds[0] === "7"));
+    const refreshesBeforeRetry = (await calls("powerjob/latestJobInstances")).length;
     await frame.locator(".instances-table").getByRole("button", { name: "Retry", exact: true }).click();
     await frame.getByRole("dialog").getByRole("button", { name: "Cancel" }).click();
     assert.equal((await calls("powerjob/retryFailedInstance")).length, 0);
     await frame.locator(".instances-table").getByRole("button", { name: "Retry", exact: true }).click();
     await frame.getByRole("dialog").getByRole("button", { name: "Retry", exact: true }).click();
     assert.equal((await calls("powerjob/retryFailedInstance"))[0].params.instanceId, "9007199254740993");
+    await frame.waitForFunction(count => window.__calls.filter(call => call.method === "powerjob/latestJobInstances").length > count, refreshesBeforeRetry);
+    assert.deepEqual((await calls("powerjob/latestJobInstances")).at(-1).params.jobIds, ["7"]);
 
     await button("Job details").click();
     await frame.getByRole("textbox", { name: "Job name", exact: true }).fill("Alpha updated");
