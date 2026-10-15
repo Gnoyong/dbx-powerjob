@@ -267,6 +267,9 @@ const assert = require("node:assert/strict");
                 verified: true,
                 instance: structuredClone(parent),
               };
+            case "powerjob/retryWorkflowInstance":
+            case "powerjob/stopWorkflowInstance":
+              return { success: true, verified: true, instance: structuredClone(parent) };
             case "powerjob/runWorkflow":
               return { wfInstanceId: parent.wfInstanceId };
             default:
@@ -425,6 +428,16 @@ const assert = require("node:assert/strict");
     await browserPage.waitForTimeout(100);
     assert.equal(await page.getByRole('cell', { name: '981844507211334656', exact: true }).count(), 0, 'late result must not cross workflow contexts');
     await page.getByRole('button', { name: /更新后的流程/ }).click();
+    const workflowRow = page.getByRole('row', { name: /981844507211334656/ });
+    const rowSelectionBeforeAction = await workflowRow.getAttribute('aria-selected');
+    await workflowRow.getByRole('button', { name: '重试', exact: true }).click();
+    assert.equal(await workflowRow.getAttribute('aria-selected'), rowSelectionBeforeAction);
+    await page.getByRole('button', { name: '取消', exact: true }).click();
+    assert.equal(await page.evaluate(() => window.__calls.filter(c => c.method === 'powerjob/retryWorkflowInstance').length), 0);
+    await workflowRow.getByRole('button', { name: '重试', exact: true }).click();
+    await page.getByRole('button', { name: '确认', exact: true }).click();
+    await page.waitForFunction(() => window.__calls.some(c => c.method === 'powerjob/retryWorkflowInstance'));
+    assert.equal(await page.evaluate(() => window.__calls.find(c => c.method === 'powerjob/retryWorkflowInstance').p.wfInstanceId), '981844507211334656');
     await page
       .getByRole("cell", { name: "981844507211334656", exact: true })
       .click();
@@ -501,7 +514,7 @@ const assert = require("node:assert/strict");
     await page.getByRole('button', { name: /更新后的流程/ }).click({ button: 'right' });
     await page.getByRole('menuitem', { name: '运行', exact: true }).click();
     await page.getByRole('dialog').getByRole('button', { name: '运行', exact: true }).click();
-    await page.locator('.wf-instance-actions').waitFor();
+    await page.locator('.wf-instance-list .instance-actions').waitFor();
     assert.equal(await page.getByRole('tab', { name: '实例', exact: true }).getAttribute('aria-selected'), 'true');
     const runQuery = await page.evaluate(() => window.__calls.filter(c => c.method === 'powerjob/workflowInstances').at(-1).p);
     assert.equal(runQuery.workflowId, '77');

@@ -118,6 +118,14 @@ assert.match(nodeEditor, /<Dialog\s+open=\{pickerOpen\}/, "job picker must use a
 assert.match(nodeEditor, /node\.nodeType === 1\s*\?/, "task references must use the picker branch");
 assert.match(nodeEditor, /pickerOpen.*powerjob\/jobs/s, "jobs must load only while the picker is open");
 assert.match(nodeEditor, /function search\(\)\s*\{\s*setIndex\(0\)/, "job search must restart pagination");
+const workflowInstances = readFileSync(
+  new URL("../frontend/workflow/WorkflowInstances.tsx", import.meta.url),
+  "utf8",
+);
+assert.match(workflowInstances, /<td className="instance-actions">/, "workflow instance actions belong to each table row");
+assert.match(workflowInstances, /wfInstanceId: row\.wfInstanceId/, "workflow actions must target the clicked row");
+assert.match(workflowInstances, /event\.stopPropagation\(\)/, "action clicks must not select the row");
+assert.doesNotMatch(workflowInstances, /\{w\("view"\)\}/, "row selection already opens the workflow instance");
 console.log(
-  "Workflow graph, job picker and sandbox checks passed.",
+  "Workflow graph, job picker, instance actions and sandbox checks passed.",
 );

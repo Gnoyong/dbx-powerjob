@@ -39,7 +39,10 @@ function DetailDisclosure({
   return (
     <details className="group my-1.5">
       <summary className="flex cursor-pointer list-none items-center gap-1.5 rounded border border-[var(--color-border,#d7dce5)] bg-[var(--color-muted,#eef1f5)] px-2 py-1.5 text-xs font-medium hover:brightness-95 focus-visible:outline-2 focus-visible:outline-[var(--color-primary,#3565c8)] [&::-webkit-details-marker]:hidden">
-        <ChevronRight aria-hidden="true" className="size-3.5 shrink-0 transition-transform group-open:rotate-90" />
+        <ChevronRight
+          aria-hidden="true"
+          className="size-3.5 shrink-0 transition-transform group-open:rotate-90"
+        />
         {label}
       </summary>
       <pre className="mt-1 max-h-56 overflow-auto whitespace-pre-wrap break-words rounded border border-[var(--color-border,#d7dce5)] bg-[var(--color-muted,#eef1f5)] p-2 font-mono text-[11px] leading-relaxed">
@@ -105,13 +108,14 @@ export function WorkflowInstances({
   const [selected, setSelected] = useState(initialInstanceId);
   const [detail, setDetail] = useState<WorkflowInstance | null>(null);
   const [nodeKey, setNodeKey] = useState("");
-  const [updated, setUpdated] = useState("");
   const [detailError, setDetailError] = useState("");
   useWorkflowNotice(detailError);
   const [stack, setStack] = useState<string[]>([]);
-  const [confirmation, setConfirmation] = useState<
-    "stop" | "retry" | "markSuccess" | null
-  >(null);
+  const [confirmation, setConfirmation] = useState<{
+    kind: "stop" | "retry" | "markSuccess";
+    wfInstanceId: string;
+    nodeId?: string;
+  } | null>(null);
   const [busy, setBusy] = useState(false);
   const actionPending = useRef(false);
   const actionToastId = useId();
@@ -176,7 +180,6 @@ export function WorkflowInstances({
         if (active) {
           setDetail(value);
           setDetailError("");
-          setUpdated(new Date().toLocaleTimeString(locale));
           finished = value.status !== 1 && value.status !== 2;
         }
       } catch (e) {
@@ -205,38 +208,48 @@ export function WorkflowInstances({
   const graph = useMemo(() => (detail ? runtimeDraft(detail) : null), [detail]);
   const node = detail?.peworkflowDAG?.nodes.find((n) => n.nodeId === nodeKey);
   async function performAction() {
-    if (!detail || !confirmation || actionPending.current || readOnly) return;
+    if (!confirmation || actionPending.current || readOnly) return;
     const target = confirmation;
-    const id = detail.wfInstanceId;
-    const targetNode = nodeKey;
     actionPending.current = true;
     onBusyChange(true);
     setBusy(true);
-    toast.loading(w(target), { id: actionToastId, duration: Infinity, closeButton: false });
+    toast.loading(w(target.kind), {
+      id: actionToastId,
+      duration: Infinity,
+      closeButton: false,
+    });
     try {
       const method =
-        target === "stop"
+        target.kind === "stop"
           ? "powerjob/stopWorkflowInstance"
-          : target === "retry"
+          : target.kind === "retry"
             ? "powerjob/retryWorkflowInstance"
             : "powerjob/markWorkflowNodeSuccess";
       const result = await invoke(connectionId, method, {
         appId,
-        wfInstanceId: id,
-        nodeId: targetNode,
+        wfInstanceId: target.wfInstanceId,
+        ...(target.nodeId ? { nodeId: target.nodeId } : {}),
       });
       if (mounted.current) {
         setConfirmation(null);
         toast[result.verified === false ? "warning" : "success"](
           w(result.verified === false ? "unconfirmed" : "requested"),
-          { id: actionToastId, duration: result.verified === false ? 8000 : 4000, closeButton: true },
+          {
+            id: actionToastId,
+            duration: result.verified === false ? 8000 : 4000,
+            closeButton: true,
+          },
         );
-        if (result.instance) setDetail(result.instance);
+        if (result.instance?.wfInstanceId === selected) setDetail(result.instance);
         setRefresh((n) => n + 1);
       }
     } catch (e) {
       if (mounted.current)
-        toast.error(String(e), { id: actionToastId, duration: 8000, closeButton: true });
+        toast.error(String(e), {
+          id: actionToastId,
+          duration: 8000,
+          closeButton: true,
+        });
     } finally {
       actionPending.current = false;
       if (mounted.current) {
@@ -306,272 +319,338 @@ export function WorkflowInstances({
             groupResizeBehavior="preserve-pixel-size"
           >
             <div className="flex h-full min-h-0 flex-col">
-      <div className="wf-instance-list !max-h-none !min-h-0 flex-1">
-        <table className="instances-table">
-          <thead>
-            <tr>
-              <th>{w("instanceId")}</th>
-              <th>{w("name")}</th>
-              <th>{w("status")}</th>
-              <th>{w("triggered")}</th>
-              <th>{w("finished")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {!page?.data.length ? (
-              <tr>
-                <td colSpan={5}>{w(loading ? "loading" : "empty")}</td>
-              </tr>
-            ) : (
-              page.data.map((row) => (
-                <tr
-                  key={row.wfInstanceId}
-                  tabIndex={0}
-                  aria-selected={selected === row.wfInstanceId}
-                  className={selected === row.wfInstanceId ? "selected" : ""}
-                  onClick={() => {
-                    if (!busy) {
-                      setStack([]);
-                      select(row.wfInstanceId);
-                    }
-                  }}
-                  onKeyDown={(e) => {
-                    if (
-                      e.target === e.currentTarget &&
-                      (e.key === "Enter" || e.key === " ")
-                    ) {
-                      e.preventDefault();
-                      if (!busy) {
-                        setStack([]);
-                        select(row.wfInstanceId);
-                      }
-                    }
-                  }}
-                >
-                  <td>{row.wfInstanceId}</td>
-                  <td>
-                    {row.workflowName} · #{row.workflowId}
-                  </td>
-                  <td>
-                    <span
-                      className={`wf-status wf-status-${statusTone(row.status, "WORKFLOW_INSTANCE")}`}
-                    >
-                      {statusLabel(row.status, "WORKFLOW_INSTANCE", locale)}
-                    </span>
-                  </td>
-                  <td>{row.actualTriggerTime}</td>
-                  <td>{row.finishedTime}</td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-      <Pager
-        page={page}
-        onPage={setIndex}
-        t={t}
-      />
+              <div className="wf-instance-list !max-h-none !min-h-0 flex-1">
+                <table className="instances-table">
+                  <thead>
+                    <tr>
+                      <th>{w("instanceId")}</th>
+                      <th>{w("name")}</th>
+                      <th>{w("status")}</th>
+                      <th>{w("triggered")}</th>
+                      <th>{w("finished")}</th>
+                      <th>
+                        {stack.length > 0 ? (
+                          <Button
+                            type="button"
+                            size="xs"
+                            variant="ghost"
+                            disabled={busy}
+                            onClick={() => {
+                              const parent = stack[stack.length - 1]!;
+                              setStack((items) => items.slice(0, -1));
+                              select(parent);
+                            }}
+                          >
+                            {w("back")}
+                          </Button>
+                        ) : w("actions")}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {!page?.data.length ? (
+                      <tr>
+                        <td colSpan={6}>{w(loading ? "loading" : "empty")}</td>
+                      </tr>
+                    ) : (
+                      page.data.map((row) => (
+                        <tr
+                          key={row.wfInstanceId}
+                          tabIndex={0}
+                          aria-selected={selected === row.wfInstanceId}
+                          className={
+                            selected === row.wfInstanceId ? "selected" : ""
+                          }
+                          onClick={() => {
+                            if (!busy) {
+                              setStack([]);
+                              select(row.wfInstanceId);
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            if (
+                              e.target === e.currentTarget &&
+                              (e.key === "Enter" || e.key === " ")
+                            ) {
+                              e.preventDefault();
+                              if (!busy) {
+                                setStack([]);
+                                select(row.wfInstanceId);
+                              }
+                            }
+                          }}
+                        >
+                          <td>{row.wfInstanceId}</td>
+                          <td>
+                            {row.workflowName} · #{row.workflowId}
+                          </td>
+                          <td>
+                            <span
+                              className={`wf-status wf-status-${statusTone(row.status, "WORKFLOW_INSTANCE")}`}
+                            >
+                              {statusLabel(
+                                row.status,
+                                "WORKFLOW_INSTANCE",
+                                locale,
+                              )}
+                            </span>
+                          </td>
+                          <td>{row.actualTriggerTime}</td>
+                          <td>{row.finishedTime}</td>
+                          <td className="instance-actions">
+                            {(row.status === 1 || row.status === 2) && (
+                              <Button
+                                type="button"
+                                size="xs"
+                                variant="secondary"
+                                disabled={busy || readOnly}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setConfirmation({ kind: "stop", wfInstanceId: row.wfInstanceId });
+                                }}
+                              >
+                                {w("stop")}
+                              </Button>
+                            )}
+                            {(row.status === 3 || row.status === 10) && (
+                              <Button
+                                type="button"
+                                size="xs"
+                                variant="secondary"
+                                disabled={busy || readOnly}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setConfirmation({ kind: "retry", wfInstanceId: row.wfInstanceId });
+                                }}
+                              >
+                                {w("retry")}
+                              </Button>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              <Pager
+                page={page}
+                onPage={setIndex}
+                t={t}
+              />
             </div>
           </ResizablePanel>
-          <ResizableHandle withHandle aria-label={w("resizeInstanceList")} />
-          <ResizablePanel id="workflow-instance-canvas-panel" minSize={300}>
+          <ResizableHandle
+            withHandle
+            aria-label={w("resizeInstanceList")}
+          />
+          <ResizablePanel
+            id="workflow-instance-canvas-panel"
+            minSize={300}
+          >
             <div className="flex h-full min-h-0 flex-col">
-      {!detail || !graph ? (
-        <p className="wf-empty">{w(selected ? "loading" : "selectInstance")}</p>
-      ) : (
-        <>
-          <div className="wf-inline wf-instance-actions">
-            <strong>
-              #{detail.wfInstanceId} ·{" "}
-              {statusLabel(detail.status, "WORKFLOW_INSTANCE", locale)}
-            </strong>
-            <span>
-              {w("lastUpdated")}: {updated}
-            </span>
-            {stack.length > 0 && (
-              <Button
-                type="button"
-                size="xs"
-                variant="secondary"
-                disabled={busy}
-                onClick={() => {
-                  const parent = stack[stack.length - 1]!;
-                  setStack((s) => s.slice(0, -1));
-                  select(parent);
-                }}
-              >
-                {w("back")}
-              </Button>
-            )}
-            {(detail.status === 1 || detail.status === 2) && (
-              <Button
-                type="button"
-                size="xs"
-                variant="secondary"
-                disabled={busy || readOnly}
-                onClick={() => setConfirmation("stop")}
-              >
-                {w("stop")}
-              </Button>
-            )}
-            {(detail.status === 3 || detail.status === 10) && (
-              <Button
-                type="button"
-                size="xs"
-                disabled={busy || readOnly}
-                onClick={() => setConfirmation("retry")}
-              >
-                {w("retry")}
-              </Button>
-            )}
-          </div>
-          <div className="wf-instance-main">
-            {inspectorLayout.ready && (
-              <ResizablePanelGroup
-                orientation="horizontal"
-                className="min-h-0 min-w-0 flex-1"
-                onLayoutChanged={inspectorLayout.onLayoutChanged}
-              >
-                <ResizablePanel id="workflow-instance-graph-panel" minSize={320}>
-                  <div className="flex h-full min-h-0 min-w-0">
-                    <WorkflowCanvas
-              draft={graph}
-              runtime={detail.peworkflowDAG?.nodes}
-              locale={locale}
-              editable={false}
-              graphKey={`${connectionId}:${appId}:instance:${detail.wfInstanceId}`}
-              selectedKey={nodeKey}
-              onSelect={(key) => {
-                if (!busy) {
-                  setNodeKey(key);
-                  setConfirmation(null);
-                  setShowTask(false);
-                }
-              }}
-                    />
-                  </div>
-                </ResizablePanel>
-                <ResizableHandle withHandle aria-label={w("resizeInspector")} />
-                <ResizablePanel
-                  id="workflow-instance-inspector-panel"
-                  minSize={220}
-                  defaultSize={inspectorLayout.size ?? 310}
-                  collapsedSize={36}
-                  collapsible
-                  panelRef={inspectorLayout.panelRef}
-                  onResize={(size) => {
-                    inspectorLayout.onResize(size);
-                    setInspectorCollapsed(size.inPixels <= 40);
-                  }}
-                  groupResizeBehavior="preserve-pixel-size"
-                >
-            <aside className="wf-inspector !h-full !w-full !min-w-0">
-              <div className="mb-2 flex items-center justify-between gap-1">
-                {!inspectorCollapsed && <h3 className="!m-0">{w("nodeDetails")}</h3>}
-                <Button
-                  type="button"
-                  size="xs"
-                  variant="ghost"
-                  className="!size-6 shrink-0 !p-0"
-                  aria-label={w(inspectorCollapsed ? "expandDetails" : "collapseDetails")}
-                  title={w(inspectorCollapsed ? "expandDetails" : "collapseDetails")}
-                  onClick={() => inspectorCollapsed
-                    ? inspectorLayout.panelRef.current?.expand()
-                    : inspectorLayout.panelRef.current?.collapse()}
-                >
-                  {inspectorCollapsed
-                    ? <ChevronLeft aria-hidden="true" className="size-4" />
-                    : <ChevronRight aria-hidden="true" className="size-4" />}
-                </Button>
-              </div>
-              {!inspectorCollapsed && <>
-              {node ? (
-                <>
-                  <h3>{node.nodeName || node.nodeId}</h3>
-                  <dl>
-                    <dt>{w("status")}</dt>
-                    <dd>
-                      {node.disableByControlNode
-                        ? w("controlled")
-                        : node.enable === false
-                          ? w("skipped")
-                          : statusLabel(node.status, "NORMAL", locale)}
-                    </dd>
-                    <dt>{w("nodeInstance")}</dt>
-                    <dd>{node.instanceId ?? "—"}</dd>
-                    <dt>{w("triggered")}</dt>
-                    <dd>{node.startTime ?? "—"}</dd>
-                    <dt>{w("finished")}</dt>
-                    <dd>{node.finishedTime ?? "—"}</dd>
-                  </dl>
-                  <DetailDisclosure label={w("params")} value={node.nodeParams} />
-                  <DetailDisclosure
-                    label={w(node.nodeType === 2 ? "branchResult" : "result")}
-                    value={node.result}
-                  />
-                  {node.nodeType === 3 && node.instanceId && (
-                    <Button
-                      type="button"
-                      size="xs"
-                      variant="secondary"
-                      disabled={busy}
-                      onClick={() => {
-                        setStack((s) => [...s, detail.wfInstanceId]);
-                        select(node.instanceId!);
-                      }}
-                    >
-                      {w("nested")}
-                    </Button>
-                  )}
-                  {canMarkSuccess(detail, node) && (
-                    <Button
-                      type="button"
-                      size="xs"
-                      variant="secondary"
-                      disabled={busy || readOnly}
-                      onClick={() => setConfirmation("markSuccess")}
-                    >
-                      {w("markSuccess")}
-                    </Button>
-                  )}
-                  {node.nodeType !== 2 &&
-                  node.nodeType !== 3 &&
-                  node.instanceId ? (
-                    <>
-                      <Button
-                        type="button"
-                        size="xs"
-                        variant="secondary"
-                        onClick={() => setShowTask(true)}
-                      >
-                        {w("details")}
-                      </Button>
-                      <div className="wf-node-logs">
-                        <LogViewer
-                          key={node.instanceId}
-                          connectionId={connectionId}
-                          appId={appId}
-                          instanceId={node.instanceId}
-                          t={t}
-                        />
-                      </div>
-                    </>
-                  ) : (
-                    node.nodeType !== 2 && <p>{w("notStarted")}</p>
-                  )}
-                </>
+              {!detail || !graph ? (
+                <p className="wf-empty">
+                  {w(selected ? "loading" : "selectInstance")}
+                </p>
               ) : (
-                <p>{w("selectNode")}</p>
+                <>
+                  <div className="wf-instance-main">
+                    {inspectorLayout.ready && (
+                      <ResizablePanelGroup
+                        orientation="horizontal"
+                        className="min-h-0 min-w-0 flex-1"
+                        onLayoutChanged={inspectorLayout.onLayoutChanged}
+                      >
+                        <ResizablePanel
+                          id="workflow-instance-graph-panel"
+                          minSize={320}
+                        >
+                          <div className="flex h-full min-h-0 min-w-0">
+                            <WorkflowCanvas
+                              draft={graph}
+                              runtime={detail.peworkflowDAG?.nodes}
+                              locale={locale}
+                              editable={false}
+                              graphKey={`${connectionId}:${appId}:instance:${detail.wfInstanceId}`}
+                              selectedKey={nodeKey}
+                              onSelect={(key) => {
+                                if (!busy) {
+                                  setNodeKey(key);
+                                  setConfirmation(null);
+                                  setShowTask(false);
+                                }
+                              }}
+                            />
+                          </div>
+                        </ResizablePanel>
+                        <ResizableHandle
+                          withHandle
+                          aria-label={w("resizeInspector")}
+                        />
+                        <ResizablePanel
+                          id="workflow-instance-inspector-panel"
+                          minSize={220}
+                          defaultSize={inspectorLayout.size ?? 310}
+                          collapsedSize={36}
+                          collapsible
+                          panelRef={inspectorLayout.panelRef}
+                          onResize={(size) => {
+                            inspectorLayout.onResize(size);
+                            setInspectorCollapsed(size.inPixels <= 40);
+                          }}
+                          groupResizeBehavior="preserve-pixel-size"
+                        >
+                          <aside className="wf-inspector h-full! w-full! min-w-0!">
+                            <div className="mb-2 flex items-center justify-between gap-1">
+                              {!inspectorCollapsed && (
+                                <h3 className="m-0!">{w("nodeDetails")}</h3>
+                              )}
+                              <Button
+                                type="button"
+                                size="xs"
+                                variant="ghost"
+                                className="size-6! shrink-0 p-0!"
+                                aria-label={w(
+                                  inspectorCollapsed
+                                    ? "expandDetails"
+                                    : "collapseDetails",
+                                )}
+                                title={w(
+                                  inspectorCollapsed
+                                    ? "expandDetails"
+                                    : "collapseDetails",
+                                )}
+                                onClick={() =>
+                                  inspectorCollapsed
+                                    ? inspectorLayout.panelRef.current?.expand()
+                                    : inspectorLayout.panelRef.current?.collapse()
+                                }
+                              >
+                                {inspectorCollapsed ? (
+                                  <ChevronLeft
+                                    aria-hidden="true"
+                                    className="size-4"
+                                  />
+                                ) : (
+                                  <ChevronRight
+                                    aria-hidden="true"
+                                    className="size-4"
+                                  />
+                                )}
+                              </Button>
+                            </div>
+                            {!inspectorCollapsed && (
+                              <>
+                                {node ? (
+                                  <>
+                                    <h3>{node.nodeName || node.nodeId}</h3>
+                                    <dl>
+                                      <dt>{w("status")}</dt>
+                                      <dd>
+                                        {node.disableByControlNode
+                                          ? w("controlled")
+                                          : node.enable === false
+                                            ? w("skipped")
+                                            : statusLabel(
+                                                node.status,
+                                                "NORMAL",
+                                                locale,
+                                              )}
+                                      </dd>
+                                      <dt>{w("nodeInstance")}</dt>
+                                      <dd>{node.instanceId ?? "—"}</dd>
+                                      <dt>{w("triggered")}</dt>
+                                      <dd>{node.startTime ?? "—"}</dd>
+                                      <dt>{w("finished")}</dt>
+                                      <dd>{node.finishedTime ?? "—"}</dd>
+                                    </dl>
+                                    <DetailDisclosure
+                                      label={w("params")}
+                                      value={node.nodeParams}
+                                    />
+                                    <DetailDisclosure
+                                      label={w(
+                                        node.nodeType === 2
+                                          ? "branchResult"
+                                          : "result",
+                                      )}
+                                      value={node.result}
+                                    />
+                                    {node.nodeType === 3 && node.instanceId && (
+                                      <Button
+                                        type="button"
+                                        size="xs"
+                                        variant="secondary"
+                                        disabled={busy}
+                                        onClick={() => {
+                                          setStack((s) => [
+                                            ...s,
+                                            detail.wfInstanceId,
+                                          ]);
+                                          select(node.instanceId!);
+                                        }}
+                                      >
+                                        {w("nested")}
+                                      </Button>
+                                    )}
+                                    {canMarkSuccess(detail, node) && (
+                                      <Button
+                                        type="button"
+                                        size="xs"
+                                        variant="secondary"
+                                        disabled={busy || readOnly}
+                                        onClick={() =>
+                                          setConfirmation({
+                                            kind: "markSuccess",
+                                            wfInstanceId: detail.wfInstanceId,
+                                            nodeId: node.nodeId,
+                                          })
+                                        }
+                                      >
+                                        {w("markSuccess")}
+                                      </Button>
+                                    )}
+                                    {node.nodeType !== 2 &&
+                                    node.nodeType !== 3 &&
+                                    node.instanceId ? (
+                                      <>
+                                        <Button
+                                          type="button"
+                                          size="xs"
+                                          variant="secondary"
+                                          onClick={() => setShowTask(true)}
+                                        >
+                                          {w("details")}
+                                        </Button>
+                                        <div className="wf-node-logs">
+                                          <LogViewer
+                                            key={node.instanceId}
+                                            connectionId={connectionId}
+                                            appId={appId}
+                                            instanceId={node.instanceId}
+                                            t={t}
+                                          />
+                                        </div>
+                                      </>
+                                    ) : (
+                                      node.nodeType !== 2 && (
+                                        <p>{w("notStarted")}</p>
+                                      )
+                                    )}
+                                  </>
+                                ) : (
+                                  <p>{w("selectNode")}</p>
+                                )}
+                              </>
+                            )}
+                          </aside>
+                        </ResizablePanel>
+                      </ResizablePanelGroup>
+                    )}
+                  </div>
+                </>
               )}
-              </>}
-            </aside>
-                </ResizablePanel>
-              </ResizablePanelGroup>
-            )}
-          </div>
-        </>
-      )}
             </div>
           </ResizablePanel>
         </ResizablePanelGroup>
@@ -589,11 +668,11 @@ export function WorkflowInstances({
       )}
       {confirmation && (
         <ConfirmActionDialog
-          title={w(confirmation)}
+          title={`${w(confirmation.kind)} · #${confirmation.wfInstanceId}`}
           message={w(
-            confirmation === "stop"
+            confirmation.kind === "stop"
               ? "stopWarning"
-              : confirmation === "retry"
+              : confirmation.kind === "retry"
                 ? "runWarning"
                 : "markWarning",
           )}
