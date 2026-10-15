@@ -379,48 +379,63 @@ export default function WorkflowWorkspace({
                     {w("refresh")}
                   </Button>
                 </div>
-                <div className="wf-list-rows">
+                <div className="wf-list-rows" role="list" aria-label={w("workflows")}>
                   {page?.data.map((row) => (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      key={row.id}
-                      className={`wf-list-item ${selected === row.id ? "active" : ""}`}
-                      onClick={() => navigate(() => openDefinition(row.id))}
-                      aria-haspopup="menu"
-                      aria-expanded={menu?.workflow.id === row.id}
-                      title={`${row.wfName} · ${t("jobContextHint")}`}
-                      onContextMenu={(event) => {
-                        event.preventDefault();
-                        openMenu(
-                          row,
-                          event.currentTarget,
-                          event.clientX,
-                          event.clientY,
-                        );
-                      }}
-                      onKeyDown={(event) => {
-                        if (
-                          event.key === "ContextMenu" ||
-                          (event.shiftKey && event.key === "F10")
-                        ) {
+                    <div className="job-item-wrap" role="listitem" key={row.id}>
+                      <Button
+                        type="button"
+                        size="xs"
+                        variant="ghost"
+                        className="job-item"
+                        aria-pressed={selected === row.id}
+                        aria-haspopup="menu"
+                        aria-expanded={menu?.workflow.id === row.id}
+                        title={`${row.wfName} · #${row.id} · ${t("jobContextHint")}`}
+                        onClick={() => navigate(() => openDefinition(row.id))}
+                        onContextMenu={(event) => {
                           event.preventDefault();
-                          const rect =
-                            event.currentTarget.getBoundingClientRect();
                           openMenu(
                             row,
                             event.currentTarget,
-                            rect.left + 12,
-                            rect.bottom,
+                            event.clientX,
+                            event.clientY,
                           );
-                        }
-                      }}
-                    >
-                      <strong>{row.wfName}</strong>
-                      <small>
-                        #{row.id} · {w(row.enable ? "enabled" : "disable")}
-                      </small>
-                    </Button>
+                        }}
+                        onKeyDown={(event) => {
+                          if (
+                            event.key === "ContextMenu" ||
+                            (event.shiftKey && event.key === "F10")
+                          ) {
+                            event.preventDefault();
+                            const rect =
+                              event.currentTarget.getBoundingClientRect();
+                            openMenu(
+                              row,
+                              event.currentTarget,
+                              rect.left + 12,
+                              rect.bottom,
+                            );
+                          }
+                        }}
+                      >
+                        <span className="job-main">
+                          <span className="job-name">{row.wfName}</span>
+                          <span className="job-id">#{row.id}</span>
+                        </span>
+                        <span className="job-meta">
+                          <span>
+                            {[row.timeExpressionType, row.timeExpression]
+                              .filter(Boolean)
+                              .join(" · ") || t("noSchedule")}
+                          </span>
+                          <span
+                            className={`job-enable-status job-enable-status--${row.enable ? "enabled" : "disabled"}`}
+                          >
+                            {t(row.enable ? "enabled" : "disabled")}
+                          </span>
+                        </span>
+                      </Button>
+                    </div>
                   ))}
                   {!page?.data.length && (
                     <p>{w(loading ? "loading" : "empty")}</p>
