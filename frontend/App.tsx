@@ -9,6 +9,7 @@ import type { TaskWorkspaceHandle } from "./tasks/TaskWorkspace";
 import WorkflowWorkspace from "./workflow/WorkflowWorkspace";
 import type { WorkflowToolbarActions } from "./workflow/WorkflowWorkspace";
 import { workflowText } from "./workflow/i18n";
+import { useWorkflowNotice } from "./workflow/useWorkflowNotice";
 
 export default function App() {
   const { connectionId, locale, hostFailed, t } = useHostEnvironment();
@@ -66,6 +67,12 @@ export default function App() {
         : jobsFailed
           ? "jobsFailed"
           : null;
+  useWorkflowNotice(
+    workspaceMode === "workflows" && message && message !== "jobsFailed"
+      ? t(message)
+      : "",
+    message === "openFromConnection" ? "warning" : "error",
+  );
   return (
     <div className="shell">
       <Toolbar
@@ -121,7 +128,7 @@ export default function App() {
           ? label(selectedApp.title || selectedApp.appName)
           : t(appsStatus)}
       </span>
-      {message && (
+      {workspaceMode === "tasks" && message && (
         <div
           role="status"
           className="message"

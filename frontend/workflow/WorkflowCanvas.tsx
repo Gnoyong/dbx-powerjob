@@ -1,4 +1,5 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import {
   ReactFlow,
   Background,
@@ -125,8 +126,10 @@ export function WorkflowCanvas({
   const [nodes, setNodes] = useState<FlowNode[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
   const [query, setQuery] = useState("");
-  const [error, setError] = useState("");
   const [storageFailed, setStorageFailed] = useState(false);
+  const storageToastId = useId();
+  const edgeToastId = useId();
+  useEffect(() => () => { toast.dismiss(edgeToastId); }, [edgeToastId]);
   const flow = useRef<ReactFlowInstance<FlowNode, Edge> | null>(null);
   const loaded = useRef(false);
   const generation = useRef(0);
@@ -257,6 +260,26 @@ export function WorkflowCanvas({
       })();
     }, 350);
   }, [storageKey]);
+  useEffect(() => {
+    if (storageFailed) {
+      toast.error(w("restoreLayout"), {
+        id: storageToastId,
+        duration: Infinity,
+        closeButton: false,
+        dismissible: false,
+        action: {
+          label: w("retry"),
+          onClick: (event) => {
+            event.preventDefault();
+            persist();
+          },
+        },
+      });
+    } else {
+      toast.dismiss(storageToastId);
+    }
+    return () => { toast.dismiss(storageToastId); };
+  }, [storageFailed, storageToastId, locale, persist]);
   function layout(direction: "LR" | "TB") {
     const arranged = arrangeDraft(draft, direction);
     positions.current = Object.fromEntries(
@@ -322,19 +345,6 @@ export function WorkflowCanvas({
           }}
         />
       </div>
-      {error && (
-        <div role="alert" className="wf-feedback">
-          {error}
-        </div>
-      )}
-      {storageFailed && (
-        <div role="alert" className="wf-feedback">
-          {w("restoreLayout")}{" "}
-          <Button type="button" size="xs" variant="ghost" onClick={persist}>
-            {w("retry")}
-          </Button>
-        </div>
-      )}
       <div className="workflow-canvas">
         <ReactFlow<FlowNode, Edge>
           nodes={nodes}
@@ -412,7 +422,7 @@ export function WorkflowCanvas({
               c.source === c.target ||
               draft.edges.some((e) => e.from === c.source && e.to === c.target)
             ) {
-              setError(w("invalidEdge"));
+              toast.error(w("invalidEdge"), { id: edgeToastId });
               return;
             }
             if (
@@ -421,7 +431,7 @@ export function WorkflowCanvas({
                 (e) => e.from === c.source && e.property === branch,
               )
             ) {
-              setError(w("decisionExits"));
+              toast.error(w("decisionExits"), { id: edgeToastId });
               return;
             }
             if (
@@ -430,10 +440,10 @@ export function WorkflowCanvas({
                 [...draft.edges, edge],
               )
             ) {
-              setError(w("cycle"));
+              toast.error(w("cycle"), { id: edgeToastId });
               return;
             }
-            setError("");
+            toast.dismiss(edgeToastId);
             onChange?.({ ...draft, edges: [...draft.edges, edge] });
           }}
         >

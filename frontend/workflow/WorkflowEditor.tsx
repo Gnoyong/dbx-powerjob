@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { toast } from "sonner";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { invoke, getHost } from "../host";
 import { Button } from "../components/ui/button";
@@ -26,6 +27,7 @@ import {
   newDraftNode,
 } from "./model";
 import { workflowText, type WorkflowTextKey } from "./i18n";
+import { useWorkflowNotice } from "./useWorkflowNotice";
 import type { WorkflowDefinition, WorkflowDraft, SaveOperation } from "./types";
 
 export type EditorGuard = {
@@ -83,7 +85,8 @@ export function WorkflowEditor({
   const [redo, setRedo] = useState<WorkflowDraft[]>([]);
   const [operation, setOperation] = useState<SaveOperation | null>(null);
   const [error, setError] = useState("");
-  const [errors, setErrors] = useState<string[]>([]);
+  useWorkflowNotice(error);
+  const [saveToastId] = useState(() => `workflow-save:${crypto.randomUUID()}`);
   const submitting = useRef(false);
   const [starting, setStarting] = useState(false);
   const mounted = useRef(true);
@@ -93,6 +96,8 @@ export function WorkflowEditor({
   const [restoreReady, setRestoreReady] = useState(false);
   const [pollEpoch, setPollEpoch] = useState(0);
   const [clearRecord, setClearRecord] = useState(false);
+  const clearing = useRef(false);
+  const [clearingRecord, setClearingRecord] = useState(false);
   const completed = useRef("");
   const unresolved =
     !!operation &&
@@ -112,7 +117,6 @@ export function WorkflowEditor({
         setRedo([]);
       }
       setDraft(next);
-      setErrors([]);
     },
     [draft],
   );
@@ -225,7 +229,11 @@ export function WorkflowEditor({
       return;
     const issues = draftErrors(draft);
     if (issues.length) {
-      setErrors(issues);
+      toast.error(w(issues[0] as WorkflowTextKey), {
+        description: issues.slice(1).map((key) => w(key as WorkflowTextKey)).join("\n") || undefined,
+        duration: 8000,
+        closeButton: true,
+      });
       afterSave.current = null;
       return;
     }
@@ -240,6 +248,9 @@ export function WorkflowEditor({
     submitting.current = true;
     setStarting(true);
     setError("");
+    setOperation(null);
+    setRecoverToken("");
+    toast.loading(w("saving"), { id: saveToastId, duration: Infinity, closeButton: false });
     const operationId = crypto.randomUUID();
     // Persist intent before starting any write so a reload can recover a lost RPC response.
     try {
@@ -315,6 +326,95 @@ export function WorkflowEditor({
     !editing ||
     unresolved ||
     (!!recoverToken && !operation);
+  async function resumeOperation() {
+    if (
+      submitting.current ||
+      busy ||
+      readOnly ||
+      !operation ||
+      !["partial", "unverified"].includes(operation.state)
+    ) return;
+    submitting.current = true;
+    setStarting(true);
+    setError("");
+    try {
+      const result = await invoke(connectionId, "powerjob/saveWorkflow", {
+        appId,
+        operationId: operation.operationId,
+        resume: true,
+      });
+      if (mounted.current) {
+        setOperation(result);
+        setRecoverToken(result.operationId);
+        setPollEpoch((n) => n + 1);
+      }
+    } catch (e) {
+      if (mounted.current) setError(String(e));
+    } finally {
+      submitting.current = false;
+      if (mounted.current) setStarting(false);
+    }
+  }
+  useEffect(() => {
+    if (starting && !operation) {
+      toast.loading(w("saving"), { id: saveToastId, duration: Infinity, closeButton: false });
+    } else if (!operation && !recoverToken) {
+      toast.dismiss(saveToastId);
+    } else if (!operation) {
+      toast.warning(w("partialWarning"), {
+        id: saveToastId,
+        duration: Infinity,
+        closeButton: false,
+        dismissible: false,
+        action: {
+          label: w("clearRecord"),
+          onClick: (event) => {
+            event.preventDefault();
+            if (!busy) setClearRecord(true);
+          },
+        },
+      });
+    } else if (operation.state === "running") {
+      toast.loading(w(operation.stage), { id: saveToastId, duration: Infinity, closeButton: false });
+    } else if (operation.state === "succeeded") {
+      toast.success(w("succeeded"), { id: saveToastId, duration: 4000, closeButton: true });
+    } else {
+      const mapping = Object.entries(operation.nodeIds)
+        .map(([draftId, savedId]) => `${draftId} → ${savedId}`)
+        .join(", ");
+      const description = [operation.error, unresolved ? w("partialWarning") : "", mapping ? `${w("nodeMapping")}: ${mapping}` : ""]
+        .filter(Boolean)
+        .join("\n");
+      const canResume = !readOnly && ["partial", "unverified"].includes(operation.state);
+      toast[unresolved ? "warning" : "error"](w(operation.state), {
+        id: saveToastId,
+        description,
+        duration: unresolved ? Infinity : 8000,
+        closeButton: !unresolved,
+        dismissible: !unresolved,
+        action: canResume
+          ? { label: w("resume"), onClick: (event) => {
+              event.preventDefault();
+              void resumeOperation();
+            } }
+          : unresolved
+            ? { label: w("clearRecord"), onClick: (event) => {
+                event.preventDefault();
+                if (!busy) setClearRecord(true);
+              } }
+            : undefined,
+        cancel: canResume
+          ? { label: w("clearRecord"), onClick: (event) => {
+              event.preventDefault();
+              if (!busy) setClearRecord(true);
+            } }
+          : undefined,
+      });
+    }
+    return () => {
+      if (operation?.state !== "succeeded") toast.dismiss(saveToastId);
+    };
+  }, [operation, recoverToken, readOnly, busy, starting, locale, saveToastId, unresolved]);
   return (
     <div className="wf-editor">
       <div className="wf-editor-toolbar">
@@ -531,85 +631,6 @@ export function WorkflowEditor({
         </div>
       </section>
 
-      {error && (
-        <div role="alert" className="wf-feedback">
-          {error}
-        </div>
-      )}
-      {(unresolved || (!!recoverToken && !operation)) && (
-        <div className="wf-feedback">
-          <p>{w("partialWarning")}</p>
-          <Button
-            type="button"
-            size="xs"
-            variant="secondary"
-            disabled={busy}
-            onClick={() => setClearRecord(true)}
-          >
-            {w("clearRecord")}
-          </Button>
-        </div>
-      )}
-      {errors.length > 0 && (
-        <ul role="alert" className="wf-feedback">
-          {errors.map((k) => (
-            <li key={k}>{w(k as WorkflowTextKey)}</li>
-          ))}
-        </ul>
-      )}
-      {operation && (
-        <div
-          className="wf-save-status"
-          role={operation.state === "running" ? "status" : "alert"}
-        >
-          <strong>
-            {w(
-              operation.state === "running" ? operation.stage : operation.state,
-            )}
-          </strong>
-          {operation.error && <p>{operation.error}</p>}
-          {operation.state !== "running" &&
-            operation.state !== "succeeded" &&
-            Object.keys(operation.nodeIds).length > 0 && (
-              <details>
-                <summary>{w("nodeMapping")}</summary>
-                <pre>{JSON.stringify(operation.nodeIds, null, 2)}</pre>
-              </details>
-            )}
-          {(operation.state === "partial" ||
-            operation.state === "unverified") && (
-            <Button
-              type="button"
-              size="xs"
-              variant="secondary"
-              disabled={busy || readOnly}
-              onClick={() => {
-                setStarting(true);
-                void invoke(connectionId, "powerjob/saveWorkflow", {
-                  appId,
-                  operationId: operation.operationId,
-                  resume: true,
-                })
-                  .then((result) => {
-                    if (mounted.current) {
-                      setOperation(result);
-                      setRecoverToken(result.operationId);
-                      setPollEpoch((n) => n + 1);
-                    }
-                  })
-                  .catch((e) => {
-                    if (mounted.current) setError(String(e));
-                  })
-                  .finally(() => {
-                    if (mounted.current) setStarting(false);
-                  });
-              }}
-            >
-              {w("resume")}
-            </Button>
-          )}
-        </div>
-      )}
       <div className="wf-editor-main">
         {inspectorLayout.ready && (
           <ResizablePanelGroup
@@ -721,7 +742,7 @@ export function WorkflowEditor({
         )}
       </div>
       {clearRecord && (
-        <Dialog open onOpenChange={setClearRecord}>
+        <Dialog open onOpenChange={(open) => { if (!clearing.current) setClearRecord(open); }}>
           <DialogContent className="confirm-action-dialog">
             <DialogTitle>{w("clearRecord")}</DialogTitle>
             <p>{w("clearWarning")}</p>
@@ -730,6 +751,7 @@ export function WorkflowEditor({
                 type="button"
                 size="xs"
                 variant="secondary"
+                disabled={clearingRecord}
                 onClick={() => setClearRecord(false)}
               >
                 {w("cancel")}
@@ -737,7 +759,11 @@ export function WorkflowEditor({
               <Button
                 type="button"
                 size="xs"
+                disabled={busy || clearingRecord}
                 onClick={() => {
+                  if (clearing.current || busy) return;
+                  clearing.current = true;
+                  setClearingRecord(true);
                   void (async () => {
                     try {
                       const host = getHost();
@@ -761,8 +787,12 @@ export function WorkflowEditor({
                       setClearRecord(false);
                       setUndo([]);
                       setRedo([]);
+                      toast.success(w("clearRecord"), { duration: 4000, closeButton: true });
                     } catch (e) {
                       setError(String(e));
+                    } finally {
+                      clearing.current = false;
+                      if (mounted.current) setClearingRecord(false);
                     }
                   })();
                 }}

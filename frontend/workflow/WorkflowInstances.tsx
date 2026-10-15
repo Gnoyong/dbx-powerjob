@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import { invoke } from "../host";
 import { statusLabel, statusTone } from "../format";
 import { Button } from "../components/ui/button";
@@ -15,6 +16,7 @@ import type { Locale } from "../i18n";
 import type { T } from "../uiTypes";
 import type { Page } from "../types";
 import { workflowText } from "./i18n";
+import { useWorkflowNotice } from "./useWorkflowNotice";
 import { WorkflowCanvas } from "./WorkflowCanvas";
 import { canMarkSuccess, runtimeDraft } from "./model";
 import type { WorkflowInstance } from "./types";
@@ -48,6 +50,7 @@ export function WorkflowInstances({
   const [index, setIndex] = useState(0);
   const [page, setPage] = useState<Page<WorkflowInstance> | null>(null);
   const [error, setError] = useState("");
+  useWorkflowNotice(error);
   const [loading, setLoading] = useState(false);
   const [refresh, setRefresh] = useState(0);
   const [selected, setSelected] = useState(initialInstanceId);
@@ -55,21 +58,23 @@ export function WorkflowInstances({
   const [nodeKey, setNodeKey] = useState("");
   const [updated, setUpdated] = useState("");
   const [detailError, setDetailError] = useState("");
+  useWorkflowNotice(detailError);
   const [stack, setStack] = useState<string[]>([]);
   const [confirmation, setConfirmation] = useState<
     "stop" | "retry" | "markSuccess" | null
   >(null);
   const [busy, setBusy] = useState(false);
   const actionPending = useRef(false);
-  const [actionMessage, setActionMessage] = useState("");
+  const actionToastId = useId();
   const [showTask, setShowTask] = useState(false);
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
     return () => {
       mounted.current = false;
+      toast.dismiss(actionToastId);
     };
-  }, []);
+  }, [actionToastId]);
   useEffect(() => {
     let active = true,
       inFlight = false;
@@ -146,7 +151,6 @@ export function WorkflowInstances({
     setNodeKey("");
     setConfirmation(null);
     setShowTask(false);
-    setActionMessage("");
     setDetailError("");
   }
   const graph = useMemo(() => (detail ? runtimeDraft(detail) : null), [detail]);
@@ -159,7 +163,7 @@ export function WorkflowInstances({
     actionPending.current = true;
     onBusyChange(true);
     setBusy(true);
-    setActionMessage("");
+    toast.loading(w(target), { id: actionToastId, duration: Infinity, closeButton: false });
     try {
       const method =
         target === "stop"
@@ -174,14 +178,16 @@ export function WorkflowInstances({
       });
       if (mounted.current) {
         setConfirmation(null);
-        setActionMessage(
+        toast[result.verified === false ? "warning" : "success"](
           w(result.verified === false ? "unconfirmed" : "requested"),
+          { id: actionToastId, duration: result.verified === false ? 8000 : 4000, closeButton: true },
         );
         if (result.instance) setDetail(result.instance);
         setRefresh((n) => n + 1);
       }
     } catch (e) {
-      if (mounted.current) setActionMessage(String(e));
+      if (mounted.current)
+        toast.error(String(e), { id: actionToastId, duration: 8000, closeButton: true });
     } finally {
       actionPending.current = false;
       if (mounted.current) {
@@ -236,14 +242,6 @@ export function WorkflowInstances({
           {w("refresh")}
         </Button>
       </div>
-      {error && (
-        <p
-          role="alert"
-          className="wf-feedback"
-        >
-          {error}
-        </p>
-      )}
       <div className="wf-instance-list">
         <table className="instances-table">
           <thead>
@@ -310,22 +308,6 @@ export function WorkflowInstances({
         onPage={setIndex}
         t={t}
       />
-      {detailError && (
-        <p
-          role="alert"
-          className="wf-feedback"
-        >
-          {detailError}
-        </p>
-      )}
-      {actionMessage && (
-        <p
-          role="status"
-          className="wf-feedback"
-        >
-          {actionMessage}
-        </p>
-      )}
       {!detail || !graph ? (
         <p className="wf-empty">{w(selected ? "loading" : "selectInstance")}</p>
       ) : (

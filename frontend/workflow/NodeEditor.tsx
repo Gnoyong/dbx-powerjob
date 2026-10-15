@@ -9,6 +9,7 @@ import {
 import type { Locale } from "../i18n";
 import type { DraftNode } from "./types";
 import { workflowText } from "./i18n";
+import { useWorkflowNotice } from "./useWorkflowNotice";
 
 export function NodeEditor({
   node,
@@ -36,6 +37,7 @@ export function NodeEditor({
   const [options, setOptions] = useState<{ id: string; name: string }[]>([]);
   const [total, setTotal] = useState(0);
   const [error, setError] = useState("");
+  useWorkflowNotice(error);
   const [loading, setLoading] = useState(false);
   useEffect(() => {
     if (node.nodeType === 2) return;
@@ -175,7 +177,6 @@ export function NodeEditor({
               {w("next")}
             </Button>
           </div>
-          {error && <p role="alert">{error}</p>}
         </>
       )}
       <label>

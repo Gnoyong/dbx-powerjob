@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { invoke } from "../host";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -20,6 +21,7 @@ import { WorkflowEditor, type EditorGuard } from "./WorkflowEditor";
 import { WorkflowInstances } from "./WorkflowInstances";
 import type { WorkflowDefinition } from "./types";
 import { WorkflowContextMenu, type WorkflowMenu } from "./WorkflowContextMenu";
+import { useWorkflowNotice } from "./useWorkflowNotice";
 
 export type WorkflowToolbarActions = {
   connectionId: string;
@@ -70,6 +72,7 @@ export default function WorkflowWorkspace({
   );
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
+  useWorkflowNotice(error);
   const [loading, setLoading] = useState(false);
   const [refresh, setRefresh] = useState(0);
   const [editorEpoch, setEditorEpoch] = useState(0);
@@ -88,7 +91,7 @@ export default function WorkflowWorkspace({
   const actionPending = useRef(false);
   const [params, setParams] = useState("");
   const [delay, setDelay] = useState("0");
-  const [message, setMessage] = useState("");
+  useWorkflowNotice(capabilitiesReady && readOnly ? w("readOnly") : "", "warning");
   const mounted = useRef(true);
   useEffect(
     () => setMenu(null),
@@ -233,7 +236,6 @@ export default function WorkflowWorkspace({
   }, [connectionId, appId, selected, creating, editorEpoch]);
   function openDefinition(id: string) {
     setError("");
-    setMessage("");
     setSelected(id);
     setCreating(false);
     guard.current = null;
@@ -242,7 +244,6 @@ export default function WorkflowWorkspace({
   }
   const saved = useCallback(
     (row: WorkflowDefinition) => {
-      setMessage(w("saved"));
       setPage((p) =>
         p ? { ...p, data: p.data.map((r) => (r.id === row.id ? row : r)) } : p,
       );
@@ -253,7 +254,7 @@ export default function WorkflowWorkspace({
         setRefresh((n) => n + 1);
       }
     },
-    [selected, locale],
+    [selected],
   );
   async function perform() {
     if (!actionWorkflow || !action || actionPending.current || readOnly) return;
@@ -323,7 +324,7 @@ export default function WorkflowWorkspace({
       }
       if (mounted.current) {
         setAction(null);
-        setMessage(w("requested"));
+        toast.success(w("requested"), { duration: 4000, closeButton: true });
       }
     } catch (e) {
       if (mounted.current) setError(String(e));
@@ -334,17 +335,6 @@ export default function WorkflowWorkspace({
   }
   return (
     <div className="wf-workspace">
-      {readOnly && <div className="wf-feedback">{w("readOnly")}</div>}
-      {error && (
-        <div role="alert" className="wf-feedback">
-          {error}
-        </div>
-      )}
-      {message && (
-        <div role="status" className="wf-feedback">
-          {message}
-        </div>
-      )}
       <div className="wf-definition-main">
         {listLayout.ready && (
           <ResizablePanelGroup
@@ -681,7 +671,6 @@ export default function WorkflowWorkspace({
                 onChange={(e) => setDelay(e.target.value)}
               />
             </label>
-            {error && <p role="alert">{error}</p>}
             <div className="wf-inline">
               <Button
                 type="button"

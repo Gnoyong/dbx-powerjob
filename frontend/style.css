@@ -44,22 +44,6 @@
   border-bottom: 1px solid var(--color-border, #d7dce5);
 }
 
-.wf-feedback,
-.wf-save-status {
-  padding: 5px 10px;
-  margin: 0;
-  border-bottom: 1px solid var(--color-border, #d7dce5);
-  overflow-wrap: anywhere;
-}
-
-.wf-feedback {
-  color: var(--color-destructive, #bd4444);
-}
-
-.wf-save-status p {
-  margin: 4px 0;
-}
-
 .wf-definition-main {
   display: flex;
   flex: 1;
@@ -385,8 +369,7 @@
   opacity: 0.75;
 }
 
-.wf-inspector pre,
-.wf-save-status pre {
+.wf-inspector pre {
   max-height: 220px;
   overflow: auto;
   white-space: pre-wrap;
