@@ -11,6 +11,20 @@
   min-height: 0;
   height: 100%;
   font-size: 12px;
+  line-height: 1.4;
+}
+
+/* Match the compact controls used in the Jobs workspace. */
+.wf-workspace input[data-slot="input"] {
+  height: 28px;
+  padding: 3px 7px;
+  font-size: 12px;
+}
+
+.wf-workspace :is(h3, legend) {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .wf-inline {
@@ -26,13 +40,13 @@
 .wf-canvas-toolbar,
 .wf-definition-actions,
 .wf-instance-actions {
-  padding: 7px 10px;
+  padding: 5px 10px;
   border-bottom: 1px solid var(--color-border, #d7dce5);
 }
 
 .wf-feedback,
 .wf-save-status {
-  padding: 8px 12px;
+  padding: 5px 10px;
   margin: 0;
   border-bottom: 1px solid var(--color-border, #d7dce5);
   overflow-wrap: anywhere;
@@ -51,6 +65,54 @@
   flex: 1;
   min-height: 0;
   min-width: 0;
+  overflow: auto;
+}
+
+.wf-definition-split {
+  flex: 1;
+  min-width: 748px;
+}
+
+.wf-editor-split {
+  flex: 1;
+  min-width: 548px;
+}
+
+.wf-tab-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
+
+.wf-detail-tabs {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  padding-block: 5px;
+}
+
+.wf-definition-split > [data-slot="resizable-panel"] > div,
+.wf-editor-split > [data-slot="resizable-panel"] > div {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
+
+.wf-definition-split > [data-slot="resizable-panel"],
+.wf-editor-split > [data-slot="resizable-panel"] {
+  display: flex;
+  min-height: 0;
+}
+
+.wf-definition-split .wf-list,
+.wf-editor-split .wf-inspector {
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  border: 0;
 }
 
 .wf-list {
@@ -58,8 +120,8 @@
   min-width: 180px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 8px;
+  gap: 6px;
+  padding: 6px;
   border-right: 1px solid var(--color-border, #d7dce5);
 }
 
@@ -76,9 +138,24 @@
   text-align: left;
   width: 100%;
   height: auto;
-  min-height: 54px;
-  white-space: normal;
-  overflow-wrap: anywhere;
+  min-height: 52px;
+  gap: 3px;
+  padding: 7px 10px;
+  border-radius: 0;
+  border-bottom: 1px solid var(--color-border, #edf0f3);
+  font-size: 12px;
+}
+
+.wf-list-item strong,
+.wf-list-item small {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wf-list-item strong {
+  font-weight: 600;
 }
 
 .wf-list-item.active {
@@ -86,6 +163,7 @@
 }
 
 .wf-list-item small {
+  font-size: 11px;
   font-weight: normal;
   color: var(--color-muted-foreground, #677282);
 }
@@ -127,7 +205,7 @@
 }
 
 .wf-add-bar {
-  padding: 7px;
+  padding: 5px 10px;
 }
 
 .wf-canvas-section {
@@ -177,10 +255,11 @@
 .wf-node {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 3px;
   width: 220px;
-  min-height: 96px;
-  padding: 12px;
+  min-height: 76px;
+  padding: 8px 10px;
+  font-size: 12px;
   background: var(--color-background, #fff);
   border: 1px solid var(--color-border, #cbd2dc);
   border-left-width: 4px;
@@ -243,7 +322,7 @@
 .wf-inspector {
   width: 310px;
   min-width: 260px;
-  padding: 10px;
+  padding: 6px;
   overflow: auto;
   border-left: 1px solid var(--color-border, #d7dce5);
 }
@@ -251,9 +330,10 @@
 .wf-fieldset {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  margin: 0 0 15px;
-  padding: 10px;
+  min-width: 0;
+  gap: 6px;
+  margin: 0 0 8px;
+  padding: 6px 8px;
   border: 1px solid var(--color-border, #d7dce5);
   border-radius: 4px;
 }
@@ -269,6 +349,11 @@
 .wf-fieldset select,
 .wf-fieldset textarea {
   width: 100%;
+}
+
+.wf-fieldset label {
+  gap: 3px;
+  min-width: 0;
 }
 
 .wf-fieldset .wf-check {
@@ -295,7 +380,7 @@
 }
 
 .wf-inspector dd {
-  margin: 4px 0 10px;
+  margin: 2px 0 6px;
   overflow-wrap: anywhere;
 }
 
@@ -304,7 +389,7 @@
 }
 
 .wf-inspector details {
-  margin: 8px 0;
+  margin: 6px 0;
 }
 
 .wf-empty {

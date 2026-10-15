@@ -25,24 +25,24 @@ export function WorkflowInstances({
   locale,
   t,
   readOnly,
-  initialWorkflowId = "",
+  workflowId,
   initialInstanceId = "",
+  onBusyChange,
 }: {
   connectionId: string;
   appId: string;
   locale: Locale;
   t: T;
   readOnly: boolean;
-  initialWorkflowId?: string;
+  workflowId: string;
   initialInstanceId?: string;
+  onBusyChange: (busy: boolean) => void;
 }) {
   const w = workflowText(locale);
-  const [workflowId, setWorkflowId] = useState(initialWorkflowId);
-  const [instanceId, setInstanceId] = useState(initialInstanceId);
+  const [instanceId, setInstanceId] = useState("");
   const [status, setStatus] = useState("");
   const [filter, setFilter] = useState({
-    workflowId: initialWorkflowId,
-    wfInstanceId: initialInstanceId,
+    wfInstanceId: "",
     status: "",
   });
   const [index, setIndex] = useState(0);
@@ -84,6 +84,7 @@ export function WorkflowInstances({
           index,
           pageSize: 20,
           ...filter,
+          workflowId,
         });
         if (active) {
           setPage(value);
@@ -104,7 +105,7 @@ export function WorkflowInstances({
       active = false;
       clearInterval(timer);
     };
-  }, [connectionId, appId, index, filter, refresh]);
+  }, [connectionId, appId, workflowId, index, filter, refresh]);
   useEffect(() => {
     if (!selected) return;
     let active = true,
@@ -156,6 +157,7 @@ export function WorkflowInstances({
     const id = detail.wfInstanceId;
     const targetNode = nodeKey;
     actionPending.current = true;
+    onBusyChange(true);
     setBusy(true);
     setActionMessage("");
     try {
@@ -182,19 +184,15 @@ export function WorkflowInstances({
       if (mounted.current) setActionMessage(String(e));
     } finally {
       actionPending.current = false;
-      if (mounted.current) setBusy(false);
+      if (mounted.current) {
+        onBusyChange(false);
+        setBusy(false);
+      }
     }
   }
   return (
     <div className="wf-instances">
       <div className="wf-inline wf-filters">
-        <Input
-          aria-label={w("wfId")}
-          placeholder={w("wfId")}
-          inputMode="numeric"
-          value={workflowId}
-          onChange={(e) => setWorkflowId(e.target.value)}
-        />
         <Input
           aria-label={w("instanceId")}
           placeholder={w("instanceId")}
@@ -220,7 +218,7 @@ export function WorkflowInstances({
           variant="secondary"
           onClick={() => {
             setIndex(0);
-            setFilter({ workflowId, wfInstanceId: instanceId, status });
+            setFilter({ wfInstanceId: instanceId, status });
             setRefresh((n) => n + 1);
           }}
         >

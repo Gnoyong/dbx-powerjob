@@ -174,11 +174,14 @@ const assert = require("node:assert/strict");
             case "powerjob/workflowCapabilities":
               return { readOnly: !!window.__readOnly };
             case "powerjob/workflows":
-              return paged([def]);
+              return paged([def, { ...def, id: "88", wfName: "另一个流程" }]);
             case "powerjob/workflow":
-              return structuredClone(def);
+              return structuredClone(p.workflowId === "88" ? { ...def, id: "88", wfName: "另一个流程" } : def);
             case "powerjob/workflowInstances":
-              return paged([parent]);
+              if (window.__holdWorkflowInstances && p.workflowId === "77") {
+                return new Promise(resolve => { window.__releaseWorkflowInstances = () => resolve(paged([parent])); });
+              }
+              return paged(p.workflowId === "88" ? [] : [parent]);
             case "powerjob/workflowInstance":
               return structuredClone(p.wfInstanceId === "992" ? child : parent);
             case "powerjob/log":
@@ -266,7 +269,49 @@ const assert = require("node:assert/strict");
     await page.getByRole("button", { name: "工作流", exact: true }).click();
     await page.getByRole("button", { name: /演示流程/ }).click();
     await page.getByText("清洗数据", { exact: true }).last().waitFor();
+    assert.equal(await page.locator('.wf-nav').count(), 0, 'global workflow tabs should be removed');
+    assert.equal(await page.getByRole('tab', { name: '编排', exact: true }).count(), 1);
     assert.equal(await page.locator(".react-flow__node").count(), 2);
+    const density = await page.evaluate(() => {
+      const style = (selector) => getComputedStyle(document.querySelector(selector));
+      return {
+        inputHeight: style('.wf-fieldset input[data-slot="input"]').height,
+        inputFont: style('.wf-fieldset input[data-slot="input"]').fontSize,
+        rowFont: style('.wf-list-item strong').fontSize,
+        metaFont: style('.wf-list-item small').fontSize,
+        buttonHeight: style('.wf-detail-tabs button').height,
+      };
+    });
+    assert.deepEqual(density, {
+      inputHeight: '28px', inputFont: '12px', rowFont: '12px',
+      metaFont: '11px', buttonHeight: '28px',
+    }, 'workflow controls should match Jobs density');
+    const listHandle = page.getByRole('separator', { name: '调整工作流列表与详情宽度' });
+    const inspectorHandle = page.getByRole('separator', { name: '调整画布与定义编排区域宽度' });
+    const width = (selector) => page.locator(selector).evaluate(el => el.getBoundingClientRect().width);
+    const listBefore = await width('.wf-list');
+    const handleBox = await listHandle.boundingBox();
+    await browserPage.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + handleBox.height / 2);
+    await browserPage.mouse.down();
+    await browserPage.mouse.move(handleBox.x + 85, handleBox.y + handleBox.height / 2, { steps: 8 });
+    await browserPage.mouse.up();
+    assert(await width('.wf-list') > listBefore + 40, 'list separator should resize the list');
+    const inspectorBefore = await width('.wf-editor .wf-inspector');
+    await inspectorHandle.focus();
+    await inspectorHandle.press('ArrowLeft');
+    assert(await width('.wf-editor .wf-inspector') > inspectorBefore, 'keyboard should resize definition panel');
+    await page.waitForFunction(() => window.__storage.has('local.powerjob.readonly.workflow-list-width') && window.__storage.has('local.powerjob.readonly.workflow-inspector-width'));
+    await browserPage.setViewportSize({ width: 900, height: 750 });
+    assert(await width('.wf-list') >= 179, 'list minimum width');
+    assert(await width('.wf-editor .wf-inspector') >= 219, 'inspector minimum width');
+    assert(await width('.wf-editor-graph') >= 319, 'canvas minimum width');
+    await page.getByRole('textbox', { name: '查找节点', exact: true }).fill('清洗数据');
+    await page.getByRole('textbox', { name: '查找节点', exact: true }).press('Enter');
+    const narrowNode = page.locator('.react-flow__node').filter({ hasText: '清洗数据' });
+    await narrowNode.click();
+    assert.match(await narrowNode.getAttribute('class'), /selected/, 'node stays interactive in narrow canvas');
+    await browserPage.setViewportSize({ width: 1450, height: 950 });
+    await browserPage.screenshot({ path: path.resolve(__dirname, '../.ui-preview/workflow-density.png') });
     await page.getByRole("button", { name: "编辑", exact: true }).click();
     await page
       .getByRole("textbox", { name: "名称", exact: true })
@@ -288,6 +333,10 @@ const assert = require("node:assert/strict");
     await page.getByRole("button", { name: "任务", exact: true }).click();
     await page.getByRole("dialog").waitFor();
     await page.getByRole("button", { name: "继续编辑", exact: true }).click();
+    await page.getByRole('tab', { name: '实例', exact: true }).click();
+    await page.getByRole('dialog').waitFor();
+    await page.getByRole('button', { name: '继续编辑', exact: true }).click();
+    assert.equal(await page.getByRole('tab', { name: '编排', exact: true }).getAttribute('aria-selected'), 'true');
     await page.getByRole("button", { name: "保存工作流", exact: true }).click();
     await page.getByText("保存并验证成功", { exact: true }).waitFor();
     assert.equal(
@@ -299,9 +348,23 @@ const assert = require("node:assert/strict");
       1,
     );
     await page
-      .getByRole("button", { name: "工作流实例", exact: true })
+      .getByRole("tab", { name: "实例", exact: true })
       .last()
       .click();
+    assert.equal(await page.locator('.wf-list').isVisible(), true);
+    assert.equal(await page.getByRole('textbox', { name: '工作流 ID', exact: true }).count(), 0);
+    await page.waitForFunction(() => window.__calls.some(c => c.method === 'powerjob/workflowInstances' && c.p.workflowId === '77'));
+    await page.evaluate(() => { window.__holdWorkflowInstances = true; });
+    await page.locator('.wf-filters').getByRole('button', { name: '刷新', exact: true }).click();
+    await page.waitForFunction(() => !!window.__releaseWorkflowInstances);
+    await page.getByRole('button', { name: /另一个流程/ }).click();
+    await page.waitForFunction(() => window.__calls.some(c => c.method === 'powerjob/workflowInstances' && c.p.workflowId === '88'));
+    assert.equal(await page.getByRole('tab', { name: '实例', exact: true }).getAttribute('aria-selected'), 'true');
+    assert.equal(await page.getByRole('cell', { name: '981844507211334656', exact: true }).count(), 0);
+    await page.evaluate(() => { window.__holdWorkflowInstances = false; window.__releaseWorkflowInstances(); });
+    await browserPage.waitForTimeout(100);
+    assert.equal(await page.getByRole('cell', { name: '981844507211334656', exact: true }).count(), 0, 'late result must not cross workflow contexts');
+    await page.getByRole('button', { name: /更新后的流程/ }).click();
     await page
       .getByRole("cell", { name: "981844507211334656", exact: true })
       .click();
@@ -349,7 +412,18 @@ const assert = require("node:assert/strict");
       path: path.resolve(__dirname, "../.ui-preview/workflow.png"),
       fullPage: true,
     });
-    await page.getByRole("button", { name: "定义与编排", exact: true }).click();
+    await page.getByRole("tab", { name: "编排", exact: true }).click();
+    const pollCount = await page.evaluate(() => window.__calls.filter(c => c.method === 'powerjob/workflowInstances').length);
+    await browserPage.waitForTimeout(3200);
+    assert.equal(await page.evaluate(() => window.__calls.filter(c => c.method === 'powerjob/workflowInstances').length), pollCount, 'hidden instances must stop polling');
+    await page.getByRole('button', { name: '运行', exact: true }).click();
+    await page.getByRole('dialog').getByRole('button', { name: '运行', exact: true }).click();
+    await page.locator('.wf-instance-actions').waitFor();
+    assert.equal(await page.getByRole('tab', { name: '实例', exact: true }).getAttribute('aria-selected'), 'true');
+    const runQuery = await page.evaluate(() => window.__calls.filter(c => c.method === 'powerjob/workflowInstances').at(-1).p);
+    assert.equal(runQuery.workflowId, '77');
+    assert.equal(runQuery.wfInstanceId, '', 'run selects the new instance without narrowing the list');
+    await page.getByRole('tab', { name: '编排', exact: true }).click();
     await page.getByRole("button", { name: "新建工作流", exact: true }).click();
     await page
       .getByRole("textbox", { name: "名称", exact: true })

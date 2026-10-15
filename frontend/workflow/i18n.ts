@@ -4,6 +4,10 @@ const en = {
   clearWarning:
     "Confirm that you checked the write outcome in PowerJob. Clearing the journal does not roll back written nodes. Reload or recreate the draft before saving again.",
   workflows: "Workflows",
+  orchestration: "Orchestration",
+  instanceTab: "Instances",
+  resizeList: "Resize workflow list and details",
+  resizeInspector: "Resize workflow canvas and definition panel",
   definitions: "Definitions",
   instances: "Workflow instances",
   newWorkflow: "New workflow",
@@ -132,6 +136,10 @@ const zh: Record<keyof typeof en, string> = {
   clearWarning:
     "请确认已在 PowerJob 核对写入结果。清除记录不会回滚已写入的节点；再次保存前应重新读取或重建草稿。",
   workflows: "工作流",
+  orchestration: "编排",
+  instanceTab: "实例",
+  resizeList: "调整工作流列表与详情宽度",
+  resizeInspector: "调整画布与定义编排区域宽度",
   definitions: "定义与编排",
   instances: "工作流实例",
   newWorkflow: "新建工作流",

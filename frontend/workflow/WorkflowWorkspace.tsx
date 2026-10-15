@@ -5,6 +5,13 @@ import { Input } from "../components/ui/input";
 import { Dialog, DialogContent, DialogTitle } from "../components/ui/dialog";
 import { ConfirmActionDialog } from "../components/ConfirmActionDialog";
 import { Pager } from "../components/Pager";
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "../components/ui/resizable";
+import { useStoredPanelSize } from "../hooks/useStoredPanelSize";
+import { useStorageToast } from "../hooks/useStorageToast";
 import type { Locale } from "../i18n";
 import type { T } from "../uiTypes";
 import type { Page } from "../types";
@@ -27,6 +34,16 @@ export default function WorkflowWorkspace({
   registerNavigation: (guard: ((action: () => void) => void) | null) => void;
 }) {
   const w = workflowText(locale);
+  const listLayout = useStoredPanelSize(
+    "local.powerjob.readonly.workflow-list-width",
+    180,
+  );
+  useStorageToast(
+    "workflow-list-layout",
+    listLayout.failed,
+    listLayout.retry,
+    t,
+  );
   const [tab, setTab] = useState<"definitions" | "instances">("definitions");
   const [index, setIndex] = useState(0);
   const [keyword, setKeyword] = useState("");
@@ -153,11 +170,13 @@ export default function WorkflowWorkspace({
     };
   }, [connectionId, appId, selected, creating, editorEpoch]);
   function openDefinition(id: string) {
+    setError("");
+    setMessage("");
     setSelected(id);
     setCreating(false);
     guard.current = null;
     setAction(null);
-    setTab("definitions");
+    setInstanceTarget({ workflowId: id, instanceId: "" });
   }
   const saved = useCallback(
     (row: WorkflowDefinition) => {
@@ -249,210 +268,276 @@ export default function WorkflowWorkspace({
   }
   return (
     <div className="wf-workspace">
-      <nav
-        className="wf-inline wf-nav"
-        aria-label={w("workflows")}
-      >
-        {(["definitions", "instances"] as const).map((mode) => (
-          <Button
-            type="button"
-            size="xs"
-            variant={tab === mode ? "default" : "secondary"}
-            key={mode}
-            onClick={() =>
-              navigate(() => {
-                guard.current = null;
-                setTab(mode);
-                setEditorEpoch((n) => n + 1);
-                if (mode === "instances")
-                  setInstanceTarget({ workflowId: selected, instanceId: "" });
-              })
-            }
-          >
-            {w(mode)}
-          </Button>
-        ))}
-        {readOnly && <span>{w("readOnly")}</span>}
-      </nav>
+      {readOnly && <div className="wf-feedback">{w("readOnly")}</div>}
       {error && (
-        <div
-          role="alert"
-          className="wf-feedback"
-        >
+        <div role="alert" className="wf-feedback">
           {error}
         </div>
       )}
       {message && (
-        <div
-          role="status"
-          className="wf-feedback"
-        >
+        <div role="status" className="wf-feedback">
           {message}
         </div>
       )}
-      {tab === "definitions" ? (
-        <div className="wf-definition-main">
-          <aside className="wf-list">
-            <div className="wf-inline">
-              <Input
-                aria-label={w("search")}
-                placeholder={w("search")}
-                value={keyword}
-                onChange={(e) => setKeyword(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    setIndex(0);
-                    setQuery(keyword);
-                  }
-                }}
-                className="h-7 text-sm w-32"
-              />
-              <Button
-                type="button"
-                size="xs"
-                variant="secondary"
-                onClick={() => {
-                  setIndex(0);
-                  setQuery(keyword);
-                  setRefresh((n) => n + 1);
-                }}
-              >
-                {w("search")}
-              </Button>
-            </div>
-            <div className="wf-inline">
-              <Button
-                type="button"
-                size="xs"
-                disabled={busy || readOnly || !capabilitiesReady}
-                onClick={() =>
-                  navigate(() => {
-                    setCreating(true);
-                    setSelected("");
-                    setDefinition(undefined);
-                    setEditorEpoch((n) => n + 1);
-                    guard.current = null;
-                  })
-                }
-              >
-                {w("newWorkflow")}
-              </Button>
-              <Button
-                type="button"
-                size="xs"
-                variant="ghost"
-                onClick={() =>
-                  navigate(() => {
-                    setRefresh((n) => n + 1);
-                    setEditorEpoch((n) => n + 1);
-                    guard.current = null;
-                  })
-                }
-              >
-                {w("refresh")}
-              </Button>
-            </div>
-            <div className="wf-list-rows">
-              {page?.data.map((row) => (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  key={row.id}
-                  className={`wf-list-item ${selected === row.id ? "active" : ""}`}
-                  onClick={() => navigate(() => openDefinition(row.id))}
-                >
-                  <strong>{row.wfName}</strong>
-                  <small>
-                    #{row.id} · {w(row.enable ? "enabled" : "disable")}
-                  </small>
-                </Button>
-              ))}
-              {!page?.data.length && <p>{w(loading ? "loading" : "empty")}</p>}
-            </div>
-            <Pager
-              page={page}
-              onPage={setIndex}
-              t={t}
-            />
-          </aside>
-          <section className="wf-definition-detail">
-            {definition && (
-              <div className="wf-inline wf-definition-actions">
-                {(
-                  [
-                    "run",
-                    "copy",
-                    definition.enable ? "disable" : "enable",
-                    "delete",
-                  ] as const
-                ).map((kind) => (
+      <div className="wf-definition-main">
+        {listLayout.ready && (
+          <ResizablePanelGroup
+            orientation="horizontal"
+            className="wf-definition-split"
+            onLayoutChanged={listLayout.onLayoutChanged}
+          >
+            <ResizablePanel
+              id="workflow-list-panel"
+              minSize={180}
+              defaultSize={listLayout.size ?? 250}
+              panelRef={listLayout.panelRef}
+              onResize={listLayout.onResize}
+              groupResizeBehavior="preserve-pixel-size"
+            >
+              <aside className="wf-list">
+                <div className="wf-inline">
+                  <Input
+                    aria-label={w("search")}
+                    placeholder={w("search")}
+                    value={keyword}
+                    onChange={(e) => setKeyword(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        setIndex(0);
+                        setQuery(keyword);
+                      }
+                    }}
+                    className="h-7 text-sm w-32"
+                  />
                   <Button
                     type="button"
                     size="xs"
                     variant="secondary"
+                    onClick={() => {
+                      setIndex(0);
+                      setQuery(keyword);
+                      setRefresh((n) => n + 1);
+                    }}
+                  >
+                    {w("search")}
+                  </Button>
+                </div>
+                <div className="wf-inline">
+                  <Button
+                    type="button"
+                    size="xs"
                     disabled={busy || readOnly || !capabilitiesReady}
-                    key={kind}
                     onClick={() =>
                       navigate(() => {
-                        setAction(kind);
-                        setParams("");
-                        setDelay("0");
+                        setTab("definitions");
+                        setInstanceTarget({ workflowId: "", instanceId: "" });
+                        setCreating(true);
+                        setSelected("");
+                        setDefinition(undefined);
+                        setEditorEpoch((n) => n + 1);
+                        guard.current = null;
                       })
                     }
                   >
-                    {w(kind)}
+                    {w("newWorkflow")}
                   </Button>
-                ))}
-                <Button
-                  type="button"
-                  size="xs"
-                  variant="secondary"
-                  onClick={() =>
-                    navigate(() => {
-                      guard.current = null;
-                      setInstanceTarget({
-                        workflowId: definition.id,
-                        instanceId: "",
-                      });
-                      setTab("instances");
-                    })
-                  }
+                  <Button
+                    type="button"
+                    size="xs"
+                    variant="ghost"
+                    onClick={() =>
+                      navigate(() => {
+                        setRefresh((n) => n + 1);
+                        setEditorEpoch((n) => n + 1);
+                        guard.current = null;
+                      })
+                    }
+                  >
+                    {w("refresh")}
+                  </Button>
+                </div>
+                <div className="wf-list-rows">
+                  {page?.data.map((row) => (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      key={row.id}
+                      className={`wf-list-item ${selected === row.id ? "active" : ""}`}
+                      onClick={() => navigate(() => openDefinition(row.id))}
+                    >
+                      <strong>{row.wfName}</strong>
+                      <small>
+                        #{row.id} · {w(row.enable ? "enabled" : "disable")}
+                      </small>
+                    </Button>
+                  ))}
+                  {!page?.data.length && (
+                    <p>{w(loading ? "loading" : "empty")}</p>
+                  )}
+                </div>
+                <Pager page={page} onPage={setIndex} t={t} />
+              </aside>
+            </ResizablePanel>
+            <ResizableHandle withHandle aria-label={w("resizeList")} />
+            <ResizablePanel id="workflow-detail-panel" minSize={560}>
+              <section className="wf-definition-detail">
+                <div className="wf-detail-tabs detail-bar">
+                  <div
+                    role="tablist"
+                    aria-label={w("workflows")}
+                    className="wf-inline"
+                  >
+                    {(["definitions", "instances"] as const).map((mode) => (
+                      <Button
+                        type="button"
+                        size="xs"
+                        role="tab"
+                        key={mode}
+                        id={`workflow-tab-${mode}`}
+                        aria-controls="workflow-tab-content"
+                        aria-selected={tab === mode}
+                        disabled={
+                          mode === "instances" && (!selected || creating)
+                        }
+                        tabIndex={tab === mode ? 0 : -1}
+                        onKeyDown={(event) => {
+                          const keys = [
+                            "ArrowLeft",
+                            "ArrowRight",
+                            "Home",
+                            "End",
+                          ];
+                          if (!keys.includes(event.key)) return;
+                          event.preventDefault();
+                          const next =
+                            event.key === "Home"
+                              ? "definitions"
+                              : event.key === "End"
+                                ? "instances"
+                                : mode === "definitions"
+                                  ? "instances"
+                                  : "definitions";
+                          const target = document.getElementById(
+                            `workflow-tab-${next}`,
+                          ) as HTMLButtonElement | null;
+                          if (target && !target.disabled) {
+                            target.focus();
+                            target.click();
+                          }
+                        }}
+                        variant={tab === mode ? "default" : "secondary"}
+                        onClick={() => {
+                          if (tab !== mode)
+                            navigate(() => {
+                              guard.current = null;
+                              setTab(mode);
+                              setInstanceTarget({
+                                workflowId: selected,
+                                instanceId: "",
+                              });
+                            });
+                        }}
+                      >
+                        {w(
+                          mode === "definitions"
+                            ? "orchestration"
+                            : "instanceTab",
+                        )}
+                      </Button>
+                    ))}
+                  </div>
+                  <strong>
+                    {definition
+                      ? `${definition.wfName} · #${definition.id}`
+                      : w(creating ? "newWorkflow" : "select")}
+                  </strong>
+                </div>
+                <div
+                  id="workflow-tab-content"
+                  role="tabpanel"
+                  aria-labelledby={`workflow-tab-${tab}`}
+                  className="wf-tab-content"
                 >
-                  {w("instances")}
-                </Button>
-              </div>
-            )}
-            {creating || definition ? (
-              <WorkflowEditor
-                key={`${creating ? "new" : definition?.id}:${editorEpoch}`}
-                definition={creating ? undefined : definition}
-                connectionId={connectionId}
-                appId={appId}
-                locale={locale}
-                readOnly={readOnly || !capabilitiesReady}
-                onSaved={saved}
-                onGuard={(value) => {
-                  guard.current = value;
-                }}
-              />
-            ) : (
-              <p className="wf-empty">{w(loading ? "loading" : "select")}</p>
-            )}
-          </section>
-        </div>
-      ) : (
-        <WorkflowInstances
-          key={`${instanceTarget.workflowId}:${instanceTarget.instanceId}`}
-          connectionId={connectionId}
-          appId={appId}
-          locale={locale}
-          t={t}
-          readOnly={readOnly || !capabilitiesReady}
-          initialWorkflowId={instanceTarget.workflowId}
-          initialInstanceId={instanceTarget.instanceId}
-        />
-      )}
+                  {tab === "definitions" ? (
+                    <>
+                      {definition && (
+                        <div className="wf-inline wf-definition-actions">
+                          {(
+                            [
+                              "run",
+                              "copy",
+                              definition.enable ? "disable" : "enable",
+                              "delete",
+                            ] as const
+                          ).map((kind) => (
+                            <Button
+                              type="button"
+                              size="xs"
+                              variant="secondary"
+                              disabled={busy || readOnly || !capabilitiesReady}
+                              key={kind}
+                              onClick={() =>
+                                navigate(() => {
+                                  setAction(kind);
+                                  setParams("");
+                                  setDelay("0");
+                                })
+                              }
+                            >
+                              {w(kind)}
+                            </Button>
+                          ))}
+                        </div>
+                      )}
+                      {creating || definition ? (
+                        <WorkflowEditor
+                          key={`${creating ? "new" : definition?.id}:${editorEpoch}`}
+                          definition={creating ? undefined : definition}
+                          connectionId={connectionId}
+                          appId={appId}
+                          locale={locale}
+                          t={t}
+                          readOnly={readOnly || !capabilitiesReady}
+                          onSaved={saved}
+                          onGuard={(value) => {
+                            guard.current = value;
+                          }}
+                        />
+                      ) : (
+                        <p className="wf-empty">
+                          {w(loading ? "loading" : "select")}
+                        </p>
+                      )}
+                    </>
+                  ) : selected && !creating ? (
+                    <WorkflowInstances
+                      key={`${connectionId}:${appId}:${selected}:${instanceTarget.instanceId}`}
+                      connectionId={connectionId}
+                      appId={appId}
+                      locale={locale}
+                      t={t}
+                      readOnly={readOnly || !capabilitiesReady}
+                      workflowId={selected}
+                      initialInstanceId={
+                        instanceTarget.workflowId === selected
+                          ? instanceTarget.instanceId
+                          : ""
+                      }
+                      onBusyChange={(value) => {
+                        actionPending.current = value;
+                        setBusy(value);
+                      }}
+                    />
+                  ) : (
+                    <p className="wf-empty">{w("select")}</p>
+                  )}
+                </div>
+              </section>
+            </ResizablePanel>
+          </ResizablePanelGroup>
+        )}
+      </div>
       {leave && (
         <Dialog
           open
