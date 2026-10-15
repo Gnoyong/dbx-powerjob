@@ -21,6 +21,7 @@ export function Toolbar({
   t,
   children,
   showJobControls = true,
+  workflowControls,
 }: {
   appId: string;
   apps: Page<AppInfo> | null;
@@ -35,6 +36,13 @@ export function Toolbar({
   t: T;
   children?: ReactNode;
   showJobControls?: boolean;
+  workflowControls?: {
+    createLabel: string;
+    createDisabled: boolean;
+    refreshDisabled: boolean;
+    onCreate: () => void;
+    onRefresh: () => void;
+  };
 }) {
   const selectedIndex =
     apps?.data.findIndex((app) => String(app.id) === appId) ?? -1;
@@ -62,7 +70,10 @@ export function Toolbar({
             <NativeSelectOption value="">{t(appsStatus)}</NativeSelectOption>
           )}
           {apps?.data.map((app) => (
-            <NativeSelectOption key={app.id} value={app.id}>
+            <NativeSelectOption
+              key={app.id}
+              value={app.id}
+            >
               {label(app.title || app.appName || app.id)}
             </NativeSelectOption>
           ))}
@@ -91,30 +102,53 @@ export function Toolbar({
           ›
         </Button>
       </div>
-      <div className="toolbar-actions">
-        {children}
-        {showJobControls && (
-          <>
-            {/* <span className="readonly">{t("readonly")}</span> */}
-            <Button
-              size="xs"
-              type="button"
-              disabled={createDisabled}
-              onClick={onCreateJob}
-            >
-              <Plus size={14} aria-hidden="true" /> {t("newJob")}
-            </Button>
-            <Button
-              size="xs"
-              type="button"
-              variant="secondary"
-              onClick={onRefresh}
-            >
-              {t("refresh")}
-            </Button>
-          </>
-        )}
-      </div>
+      {showJobControls && (
+        <div className="flex gap-1">
+          {/* <span className="readonly">{t("readonly")}</span> */}
+          <Button
+            size="xs"
+            type="button"
+            disabled={createDisabled}
+            onClick={onCreateJob}
+          >
+            <Plus
+              size={14}
+              aria-hidden="true"
+            />{" "}
+            {t("newJob")}
+          </Button>
+          <Button
+            size="xs"
+            type="button"
+            variant="secondary"
+            onClick={onRefresh}
+          >
+            {t("refresh")}
+          </Button>
+        </div>
+      )}
+      {workflowControls && (
+        <div className="flex gap-1">
+          <Button
+            size="xs"
+            type="button"
+            disabled={workflowControls.createDisabled}
+            onClick={workflowControls.onCreate}
+          >
+            <Plus size={14} aria-hidden="true" /> {workflowControls.createLabel}
+          </Button>
+          <Button
+            size="xs"
+            type="button"
+            variant="secondary"
+            disabled={workflowControls.refreshDisabled}
+            onClick={workflowControls.onRefresh}
+          >
+            {t("refresh")}
+          </Button>
+        </div>
+      )}
+      <div className="toolbar-actions">{children}</div>
     </header>
   );
 }

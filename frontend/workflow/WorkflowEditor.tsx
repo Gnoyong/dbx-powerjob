@@ -317,6 +317,48 @@ export function WorkflowEditor({
     (!!recoverToken && !operation);
   return (
     <div className="wf-editor">
+      <div className="wf-editor-toolbar">
+        {dirty && <span className="wf-toolbar-status">{w("unsaved")}</span>}
+        <Button
+          type="button"
+          size="xs"
+          variant="secondary"
+          disabled={busy || readOnly || editing}
+          onClick={() => setEditing(true)}
+        >
+          {w("edit")}
+        </Button>
+        {editing && (
+          <>
+            <Button
+              type="button"
+              size="xs"
+              disabled={locked}
+              onClick={() => void save()}
+            >
+              {w("save")}
+            </Button>
+            <Button
+              type="button"
+              size="xs"
+              variant="ghost"
+              disabled={locked || !undo.length}
+              onClick={undoDraft}
+            >
+              {w("undo")}
+            </Button>
+            <Button
+              type="button"
+              size="xs"
+              variant="ghost"
+              disabled={locked || !redo.length}
+              onClick={redoDraft}
+            >
+              {w("redo")}
+            </Button>
+          </>
+        )}
+      </div>
       <section className="wf-definition-config" aria-label={w("definitions")}>
         <div className="flex">
           <Button
@@ -579,82 +621,34 @@ export function WorkflowEditor({
               <div className="wf-editor-graph">
                 <WorkflowCanvas
                   toolbar={
-                    <>
-                      <div className="wf-toolbar-group wf-editor-toolbar">
-                        {dirty && (
-                          <span className="wf-toolbar-status">
-                            {w("unsaved")}
-                          </span>
-                        )}
+                    <div className="wf-toolbar-group wf-add-bar">
+                      {([1, 2, 3] as const).map((kind) => (
                         <Button
                           type="button"
                           size="xs"
                           variant="secondary"
-                          disabled={busy || readOnly || editing}
-                          onClick={() => setEditing(true)}
+                          key={kind}
+                          disabled={locked}
+                          onClick={() => {
+                            const node = newDraftNode(kind);
+                            commit({
+                              ...draft,
+                              nodes: [...draft.nodes, node],
+                            });
+                            setSelected(node.key);
+                          }}
                         >
-                          {w("edit")}
+                          {w("add")} ·{" "}
+                          {w(
+                            kind === 1
+                              ? "task"
+                              : kind === 2
+                                ? "decision"
+                                : "nested",
+                          )}
                         </Button>
-                        {editing && (
-                          <>
-                            <Button
-                              type="button"
-                              size="xs"
-                              disabled={locked}
-                              onClick={() => void save()}
-                            >
-                              {w("save")}
-                            </Button>
-                            <Button
-                              type="button"
-                              size="xs"
-                              variant="ghost"
-                              disabled={locked || !undo.length}
-                              onClick={undoDraft}
-                            >
-                              {w("undo")}
-                            </Button>
-                            <Button
-                              type="button"
-                              size="xs"
-                              variant="ghost"
-                              disabled={locked || !redo.length}
-                              onClick={redoDraft}
-                            >
-                              {w("redo")}
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                      <div className="wf-toolbar-group wf-add-bar">
-                        {([1, 2, 3] as const).map((kind) => (
-                          <Button
-                            type="button"
-                            size="xs"
-                            variant="secondary"
-                            key={kind}
-                            disabled={locked}
-                            onClick={() => {
-                              const node = newDraftNode(kind);
-                              commit({
-                                ...draft,
-                                nodes: [...draft.nodes, node],
-                              });
-                              setSelected(node.key);
-                            }}
-                          >
-                            {w("add")} ·{" "}
-                            {w(
-                              kind === 1
-                                ? "task"
-                                : kind === 2
-                                  ? "decision"
-                                  : "nested",
-                            )}
-                          </Button>
-                        ))}
-                      </div>
-                    </>
+                      ))}
+                    </div>
                   }
                   draft={draft}
                   locale={locale}

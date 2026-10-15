@@ -7,6 +7,8 @@ import { useApplications } from "./hooks/useApplications";
 import { TaskWorkspace } from "./tasks/TaskWorkspace";
 import type { TaskWorkspaceHandle } from "./tasks/TaskWorkspace";
 import WorkflowWorkspace from "./workflow/WorkflowWorkspace";
+import type { WorkflowToolbarActions } from "./workflow/WorkflowWorkspace";
+import { workflowText } from "./workflow/i18n";
 
 export default function App() {
   const { connectionId, locale, hostFailed, t } = useHostEnvironment();
@@ -29,6 +31,17 @@ export default function App() {
   const workflowNavigation = useRef<((action: () => void) => void) | null>(
     null,
   );
+  const [workflowActions, setWorkflowActions] =
+    useState<WorkflowToolbarActions | null>(null);
+  const registerWorkflowActions = useCallback(
+    (actions: WorkflowToolbarActions | null) => setWorkflowActions(actions),
+    [],
+  );
+  const currentWorkflowActions =
+    workflowActions?.connectionId === connectionId &&
+    workflowActions.appId === appId
+      ? workflowActions
+      : null;
   const registerWorkflowNavigation = useCallback(
     (guard: ((action: () => void) => void) | null) => {
       workflowNavigation.current = guard;
@@ -68,6 +81,18 @@ export default function App() {
         onRefresh={refreshCurrent}
         t={t}
         showJobControls={workspaceMode === "tasks"}
+        workflowControls={
+          workspaceMode === "workflows"
+            ? {
+                createLabel: workflowText(locale)("newWorkflow"),
+                createDisabled:
+                  !connectionId || !appId || !currentWorkflowActions || currentWorkflowActions.createDisabled,
+                refreshDisabled: !currentWorkflowActions,
+                onCreate: () => currentWorkflowActions?.create(),
+                onRefresh: () => currentWorkflowActions?.refresh(),
+              }
+            : undefined
+        }
       >
         <Button
           type="button"
@@ -124,6 +149,7 @@ export default function App() {
               locale={locale}
               t={t}
               registerNavigation={registerWorkflowNavigation}
+              registerActions={registerWorkflowActions}
             />
           ) : (
             <p>{t("selectConnection")}</p>

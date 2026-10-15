@@ -21,18 +21,28 @@ import { WorkflowInstances } from "./WorkflowInstances";
 import type { WorkflowDefinition } from "./types";
 import { WorkflowContextMenu, type WorkflowMenu } from "./WorkflowContextMenu";
 
+export type WorkflowToolbarActions = {
+  connectionId: string;
+  appId: string;
+  create: () => void;
+  refresh: () => void;
+  createDisabled: boolean;
+};
+
 export default function WorkflowWorkspace({
   connectionId,
   appId,
   locale,
   t,
   registerNavigation,
+  registerActions,
 }: {
   connectionId: string;
   appId: string;
   locale: Locale;
   t: T;
   registerNavigation: (guard: ((action: () => void) => void) | null) => void;
+  registerActions: (actions: WorkflowToolbarActions | null) => void;
 }) {
   const w = workflowText(locale);
   const [menu, setMenu] = useState<WorkflowMenu | null>(null);
@@ -113,6 +123,40 @@ export default function WorkflowWorkspace({
     },
     [locale],
   );
+  const createWorkflow = useCallback(() => {
+    if (busy || actionPending.current || readOnly || !capabilitiesReady) return;
+    navigate(() => {
+      setTab("definitions");
+      setInstanceTarget({ workflowId: "", instanceId: "" });
+      setCreating(true);
+      setSelected("");
+      setDefinition(undefined);
+      setEditorEpoch((n) => n + 1);
+      guard.current = null;
+    });
+  }, [busy, readOnly, capabilitiesReady, navigate]);
+  const refreshWorkflow = useCallback(() => {
+    navigate(() => {
+      setRefresh((n) => n + 1);
+      setEditorEpoch((n) => n + 1);
+      guard.current = null;
+    });
+  }, [navigate]);
+  function searchWorkflows() {
+    setIndex(0);
+    setQuery(keyword);
+    setRefresh((n) => n + 1);
+  }
+  useEffect(() => {
+    registerActions({
+      connectionId,
+      appId,
+      create: createWorkflow,
+      refresh: refreshWorkflow,
+      createDisabled: busy || readOnly || !capabilitiesReady,
+    });
+    return () => registerActions(null);
+  }, [registerActions, connectionId, appId, createWorkflow, refreshWorkflow, busy, readOnly, capabilitiesReady]);
   useEffect(() => {
     registerNavigation(navigate);
     return () => registerNavigation(null);
@@ -310,74 +354,42 @@ export default function WorkflowWorkspace({
           >
             <ResizablePanel
               id="workflow-list-panel"
-              minSize={180}
+              minSize={240}
               defaultSize={listLayout.size ?? 250}
               panelRef={listLayout.panelRef}
               onResize={listLayout.onResize}
               groupResizeBehavior="preserve-pixel-size"
             >
               <aside className="wf-list">
-                <div className="wf-inline">
-                  <Input
-                    aria-label={w("search")}
-                    placeholder={w("search")}
-                    value={keyword}
-                    onChange={(e) => setKeyword(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        setIndex(0);
-                        setQuery(keyword);
-                      }
-                    }}
-                    className="h-7 text-sm w-32"
-                  />
-                  <Button
-                    type="button"
-                    size="xs"
-                    variant="secondary"
-                    onClick={() => {
-                      setIndex(0);
-                      setQuery(keyword);
-                      setRefresh((n) => n + 1);
-                    }}
-                  >
-                    {w("search")}
-                  </Button>
-                </div>
-                <div className="wf-inline">
-                  <Button
-                    type="button"
-                    size="xs"
-                    disabled={busy || readOnly || !capabilitiesReady}
-                    onClick={() =>
-                      navigate(() => {
-                        setTab("definitions");
-                        setInstanceTarget({ workflowId: "", instanceId: "" });
-                        setCreating(true);
-                        setSelected("");
-                        setDefinition(undefined);
-                        setEditorEpoch((n) => n + 1);
-                        guard.current = null;
-                      })
-                    }
-                  >
-                    {w("newWorkflow")}
-                  </Button>
-                  <Button
-                    type="button"
-                    size="xs"
-                    variant="ghost"
-                    onClick={() =>
-                      navigate(() => {
-                        setRefresh((n) => n + 1);
-                        setEditorEpoch((n) => n + 1);
-                        guard.current = null;
-                      })
-                    }
-                  >
-                    {w("refresh")}
-                  </Button>
+                <div className="pane-bar">
+                  <strong>{w("workflows")}</strong>
+                  <div className="search-form" role="search">
+                    <label htmlFor="workflow-keyword" className="sr-only">
+                      {w("searchWorkflows")}
+                    </label>
+                    <Input
+                      id="workflow-keyword"
+                      type="search"
+                      placeholder={w("searchWorkflows")}
+                      maxLength={100}
+                      value={keyword}
+                      onChange={(e) => setKeyword(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          searchWorkflows();
+                        }
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      size="xs"
+                      variant="secondary"
+                      onClick={searchWorkflows}
+                    >
+                      {w("search")}
+                    </Button>
+                  </div>
                 </div>
                 <div className="wf-list-rows" role="list" aria-label={w("workflows")}>
                   {page?.data.map((row) => (
