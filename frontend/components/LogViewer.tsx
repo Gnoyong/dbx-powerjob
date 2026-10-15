@@ -122,7 +122,7 @@ export function LogViewer({
       : t("logComplete");
   return (
     <div className="logs-pane">
-      <div className="sub-pane-bar">
+      <div className="flex items-center p-1 gap-2  ">
         <strong>{t("instanceLogs")}</strong>
         <span className="muted">{instanceId ? `#${instanceId}` : ""}</span>
         <span className="muted log-state">{state}</span>
@@ -229,7 +229,7 @@ export function LogViewer({
       </div>
       <div
         ref={scroll}
-        className="log-scroll"
+        className="log-scroll rounded border border-(--color-border) bg-(--color-muted,#eef1f5)"
         role="log"
         aria-label={t("instanceLogs")}
         onWheel={(event) => {

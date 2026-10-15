@@ -545,25 +545,35 @@ export function WorkflowInstances({
                                 {node ? (
                                   <>
                                     <h3>{node.nodeName || node.nodeId}</h3>
-                                    <dl>
-                                      <dt>{w("status")}</dt>
-                                      <dd>
-                                        {node.disableByControlNode
-                                          ? w("controlled")
-                                          : node.enable === false
-                                            ? w("skipped")
-                                            : statusLabel(
-                                                node.status,
-                                                "NORMAL",
-                                                locale,
-                                              )}
-                                      </dd>
-                                      <dt>{w("nodeInstance")}</dt>
-                                      <dd>{node.instanceId ?? "—"}</dd>
-                                      <dt>{w("triggered")}</dt>
-                                      <dd>{node.startTime ?? "—"}</dd>
-                                      <dt>{w("finished")}</dt>
-                                      <dd>{node.finishedTime ?? "—"}</dd>
+                                    <dl className="mb-0 grid grid-cols-[repeat(auto-fit,minmax(130px,1fr))] gap-x-3">
+                                      <div className="min-w-0">
+                                        <dt>{w("status")}</dt>
+                                        <dd>
+                                          {node.disableByControlNode
+                                            ? w("controlled")
+                                            : node.enable === false
+                                              ? w("skipped")
+                                              : statusLabel(
+                                                  node.status,
+                                                  "NORMAL",
+                                                  locale,
+                                                )}
+                                        </dd>
+                                      </div>
+                                      <div className="min-w-0">
+                                        <dt>{w("nodeInstance")}</dt>
+                                        <dd>{node.instanceId ?? "—"}</dd>
+                                      </div>
+                                    </dl>
+                                    <dl className="mt-0 grid grid-cols-[repeat(auto-fit,minmax(130px,1fr))] gap-x-3">
+                                      <div className="min-w-0">
+                                        <dt>{w("triggered")}</dt>
+                                        <dd>{node.startTime ?? "—"}</dd>
+                                      </div>
+                                      <div className="min-w-0">
+                                        <dt>{w("finished")}</dt>
+                                        <dd>{node.finishedTime ?? "—"}</dd>
+                                      </div>
                                     </dl>
                                     <DetailDisclosure
                                       label={w("params")}
