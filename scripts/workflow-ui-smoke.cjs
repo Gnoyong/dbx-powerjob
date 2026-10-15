@@ -168,7 +168,20 @@ const assert = require("node:assert/strict");
             case "powerjob/apps":
               return paged([{ id: "2", appName: "Demo" }]);
             case "powerjob/jobs":
-              return paged([{ id: "7", jobName: "清洗数据", enable: true }]);
+              {
+                const all = [
+                  { id: "7", jobName: "清洗数据", enable: true },
+                  ...Array.from({ length: 20 }, (_, i) => ({ id: String(i + 10), jobName: `任务 ${i + 10}`, enable: true })),
+                ];
+                const matches = all.filter(job => job.jobName.includes(p.keyword || ""));
+                return {
+                  index: p.index,
+                  pageSize: 20,
+                  totalPages: Math.ceil(matches.length / 20),
+                  totalItems: matches.length,
+                  data: matches.slice(p.index * 20, (p.index + 1) * 20),
+                };
+              }
             case "powerjob/job":
               return { id: "7", appId: "2", jobName: "清洗数据", enable: true };
             case "powerjob/workflowCapabilities":
@@ -420,6 +433,28 @@ const assert = require("node:assert/strict");
       .filter({ hasText: "清洗数据" })
       .click();
     await page.getByText("test log", { exact: true }).waitFor();
+    const instanceHeightHandle = page.getByRole('separator', { name: '调整工作流实例列表与画布高度' });
+    const instanceListHeight = await page.locator('.wf-instance-list').evaluate(el => el.getBoundingClientRect().height);
+    const heightBox = await instanceHeightHandle.boundingBox();
+    await browserPage.mouse.move(heightBox.x + heightBox.width / 2, heightBox.y + heightBox.height / 2);
+    await browserPage.mouse.down();
+    await browserPage.mouse.move(heightBox.x + heightBox.width / 2, heightBox.y + heightBox.height / 2 + 35, { steps: 8 });
+    await browserPage.mouse.up();
+    assert.notEqual(await page.locator('.wf-instance-list').evaluate(el => el.getBoundingClientRect().height), instanceListHeight);
+    await page.waitForFunction(() => typeof window.__storage.get('local.powerjob.workflow.instance-list-height') === 'number');
+    const instanceWidthHandle = page.getByRole('separator', { name: '调整画布与节点属性区域宽度' });
+    const inspectorWidth = await page.locator('.wf-inspector').evaluate(el => el.getBoundingClientRect().width);
+    const widthBox = await instanceWidthHandle.boundingBox();
+    await browserPage.mouse.move(widthBox.x + widthBox.width / 2, widthBox.y + widthBox.height / 2);
+    await browserPage.mouse.down();
+    await browserPage.mouse.move(widthBox.x + widthBox.width / 2 - 35, widthBox.y + widthBox.height / 2, { steps: 8 });
+    await browserPage.mouse.up();
+    assert.notEqual(await page.locator('.wf-inspector').evaluate(el => el.getBoundingClientRect().width), inspectorWidth);
+    await page.waitForFunction(() => typeof window.__storage.get('local.powerjob.workflow.instance-inspector-width') === 'number');
+    await page.getByRole('button', { name: '折叠详情' }).click();
+    await page.getByRole('button', { name: '展开详情' }).click();
+    await page.locator('.wf-inspector').getByText('节点参数').click();
+    assert.equal(await page.locator('.wf-inspector pre').first().evaluate(el => getComputedStyle(el).fontFamily.includes('mono')), true);
     await page
       .getByRole("button", { name: "标记节点成功", exact: true })
       .click();
@@ -479,9 +514,17 @@ const assert = require("node:assert/strict");
     await page
       .getByRole("button", { name: "添加节点 · 任务节点", exact: true })
       .click();
-    await page
-      .getByRole("combobox", { name: "引用任务 / 工作流", exact: true })
-      .selectOption("7");
+    await page.getByRole("button", { name: "选择任务", exact: true }).click();
+    const jobPicker = page.getByRole("dialog", { name: "选择任务" });
+    await jobPicker.getByRole("button", { name: "下一页" }).click();
+    await jobPicker.getByText("2 / 2").waitFor();
+    await jobPicker.getByRole("button", { name: "取消" }).click();
+    assert.equal(await page.getByTestId("selected-job-reference").textContent(), "—");
+    await page.getByRole("button", { name: "选择任务", exact: true }).click();
+    await jobPicker.getByRole("searchbox", { name: "搜索任务" }).fill("清洗");
+    await jobPicker.getByRole("button", { name: "搜索", exact: true }).click();
+    await jobPicker.getByRole("button", { name: /清洗数据.*#7/ }).click();
+    assert.match(await page.getByTestId("selected-job-reference").textContent(), /#7/);
     const firstNode = await page
       .locator(".react-flow__node")
       .first()
@@ -502,9 +545,8 @@ const assert = require("node:assert/strict");
     await page
       .getByRole("button", { name: "添加节点 · 任务节点", exact: true })
       .click();
-    await page
-      .getByRole("combobox", { name: "引用任务 / 工作流", exact: true })
-      .selectOption("7");
+    await page.getByRole("button", { name: "选择任务", exact: true }).click();
+    await page.getByRole("dialog", { name: "选择任务" }).getByRole("button", { name: /清洗数据.*#7/ }).click();
     await page.waitForFunction(
       () => document.querySelectorAll(".react-flow__node").length === 3,
     );

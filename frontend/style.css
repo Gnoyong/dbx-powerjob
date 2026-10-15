@@ -768,7 +768,9 @@ input[data-slot="input"][aria-invalid="true"] {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .list-placeholder-icon-loading svg { animation: none; }
+  .list-placeholder-icon-loading svg {
+    animation: none;
+  }
 }
 
 .list-placeholder strong {
@@ -918,11 +920,15 @@ input[data-slot="input"][aria-invalid="true"] {
 }
 
 @keyframes job-instance-spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .job-instance-loading { animation: none; }
+  .job-instance-loading {
+    animation: none;
+  }
 }
 
 .empty-pane {

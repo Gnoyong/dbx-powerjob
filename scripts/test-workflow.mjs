@@ -110,6 +110,14 @@ for (const file of [
   for (const button of text.matchAll(/<Button\b[^>]*>/g))
     assert(/type="button"/.test(button[0]), `${file}: implicit submit button`);
 }
+const nodeEditor = readFileSync(
+  new URL("../frontend/workflow/NodeEditor.tsx", import.meta.url),
+  "utf8",
+);
+assert.match(nodeEditor, /<Dialog\s+open=\{pickerOpen\}/, "job picker must use a controlled dialog");
+assert.match(nodeEditor, /node\.nodeType === 1\s*\?/, "task references must use the picker branch");
+assert.match(nodeEditor, /pickerOpen.*powerjob\/jobs/s, "jobs must load only while the picker is open");
+assert.match(nodeEditor, /function search\(\)\s*\{\s*setIndex\(0\)/, "job search must restart pagination");
 console.log(
-  "Workflow graph, recovery prerequisites and sandbox checks passed.",
+  "Workflow graph, job picker and sandbox checks passed.",
 );

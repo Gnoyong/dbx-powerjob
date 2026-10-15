@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { invoke } from "../host";
 import { statusLabel, statusTone } from "../format";
@@ -12,6 +13,13 @@ import { LogViewer } from "../components/LogViewer";
 import { InstanceDialog } from "../components/InstanceDialog";
 import { ConfirmActionDialog } from "../components/ConfirmActionDialog";
 import { Pager } from "../components/Pager";
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "../components/ui/resizable";
+import { useStoredPanelSize } from "../hooks/useStoredPanelSize";
+import { useStorageToast } from "../hooks/useStorageToast";
 import type { Locale } from "../i18n";
 import type { T } from "../uiTypes";
 import type { Page } from "../types";
@@ -20,6 +28,26 @@ import { useWorkflowNotice } from "./useWorkflowNotice";
 import { WorkflowCanvas } from "./WorkflowCanvas";
 import { canMarkSuccess, runtimeDraft } from "./model";
 import type { WorkflowInstance } from "./types";
+
+function DetailDisclosure({
+  label,
+  value,
+}: {
+  label: string;
+  value?: string | null;
+}) {
+  return (
+    <details className="group my-1.5">
+      <summary className="flex cursor-pointer list-none items-center gap-1.5 rounded border border-[var(--color-border,#d7dce5)] bg-[var(--color-muted,#eef1f5)] px-2 py-1.5 text-xs font-medium hover:brightness-95 focus-visible:outline-2 focus-visible:outline-[var(--color-primary,#3565c8)] [&::-webkit-details-marker]:hidden">
+        <ChevronRight aria-hidden="true" className="size-3.5 shrink-0 transition-transform group-open:rotate-90" />
+        {label}
+      </summary>
+      <pre className="mt-1 max-h-56 overflow-auto whitespace-pre-wrap break-words rounded border border-[var(--color-border,#d7dce5)] bg-[var(--color-muted,#eef1f5)] p-2 font-mono text-[11px] leading-relaxed">
+        {value ?? "—"}
+      </pre>
+    </details>
+  );
+}
 
 export function WorkflowInstances({
   connectionId,
@@ -41,6 +69,27 @@ export function WorkflowInstances({
   onBusyChange: (busy: boolean) => void;
 }) {
   const w = workflowText(locale);
+  const inspectorLayout = useStoredPanelSize(
+    "local.powerjob.workflow.instance-inspector-width",
+    220,
+  );
+  const listLayout = useStoredPanelSize(
+    "local.powerjob.workflow.instance-list-height",
+    90,
+  );
+  useStorageToast(
+    "workflow-instance-inspector-layout",
+    inspectorLayout.failed,
+    inspectorLayout.retry,
+    t,
+  );
+  useStorageToast(
+    "workflow-instance-list-layout",
+    listLayout.failed,
+    listLayout.retry,
+    t,
+  );
+  const [inspectorCollapsed, setInspectorCollapsed] = useState(false);
   const [instanceId, setInstanceId] = useState("");
   const [status, setStatus] = useState("");
   const [filter, setFilter] = useState({
@@ -242,7 +291,22 @@ export function WorkflowInstances({
           {w("refresh")}
         </Button>
       </div>
-      <div className="wf-instance-list">
+      {listLayout.ready && (
+        <ResizablePanelGroup
+          orientation="vertical"
+          className="min-h-0 min-w-0 flex-1"
+          onLayoutChanged={listLayout.onLayoutChanged}
+        >
+          <ResizablePanel
+            id="workflow-instance-list-panel"
+            minSize={90}
+            defaultSize={listLayout.size ?? 210}
+            panelRef={listLayout.panelRef}
+            onResize={listLayout.onResize}
+            groupResizeBehavior="preserve-pixel-size"
+          >
+            <div className="flex h-full min-h-0 flex-col">
+      <div className="wf-instance-list !max-h-none !min-h-0 flex-1">
         <table className="instances-table">
           <thead>
             <tr>
@@ -308,6 +372,11 @@ export function WorkflowInstances({
         onPage={setIndex}
         t={t}
       />
+            </div>
+          </ResizablePanel>
+          <ResizableHandle withHandle aria-label={w("resizeInstanceList")} />
+          <ResizablePanel id="workflow-instance-canvas-panel" minSize={300}>
+            <div className="flex h-full min-h-0 flex-col">
       {!detail || !graph ? (
         <p className="wf-empty">{w(selected ? "loading" : "selectInstance")}</p>
       ) : (
@@ -358,7 +427,15 @@ export function WorkflowInstances({
             )}
           </div>
           <div className="wf-instance-main">
-            <WorkflowCanvas
+            {inspectorLayout.ready && (
+              <ResizablePanelGroup
+                orientation="horizontal"
+                className="min-h-0 min-w-0 flex-1"
+                onLayoutChanged={inspectorLayout.onLayoutChanged}
+              >
+                <ResizablePanel id="workflow-instance-graph-panel" minSize={320}>
+                  <div className="flex h-full min-h-0 min-w-0">
+                    <WorkflowCanvas
               draft={graph}
               runtime={detail.peworkflowDAG?.nodes}
               locale={locale}
@@ -372,25 +449,43 @@ export function WorkflowInstances({
                   setShowTask(false);
                 }
               }}
-            />
-            <aside className="wf-inspector">
-              <h3>{w("instances")}</h3>
-              <dl>
-                <dt>{w("triggered")}</dt>
-                <dd>{detail.actualTriggerTime ?? "—"}</dd>
-                <dt>{w("finished")}</dt>
-                <dd>{detail.finishedTime ?? "—"}</dd>
-              </dl>
-              {[
-                [w("initParams"), detail.wfInitParams],
-                [w("context"), detail.wfContext],
-                [w("result"), detail.result],
-              ].map(([label, value]) => (
-                <details key={label}>
-                  <summary>{label}</summary>
-                  <pre>{value ?? "—"}</pre>
-                </details>
-              ))}
+                    />
+                  </div>
+                </ResizablePanel>
+                <ResizableHandle withHandle aria-label={w("resizeInspector")} />
+                <ResizablePanel
+                  id="workflow-instance-inspector-panel"
+                  minSize={220}
+                  defaultSize={inspectorLayout.size ?? 310}
+                  collapsedSize={36}
+                  collapsible
+                  panelRef={inspectorLayout.panelRef}
+                  onResize={(size) => {
+                    inspectorLayout.onResize(size);
+                    setInspectorCollapsed(size.inPixels <= 40);
+                  }}
+                  groupResizeBehavior="preserve-pixel-size"
+                >
+            <aside className="wf-inspector !h-full !w-full !min-w-0">
+              <div className="mb-2 flex items-center justify-between gap-1">
+                {!inspectorCollapsed && <h3 className="!m-0">{w("nodeDetails")}</h3>}
+                <Button
+                  type="button"
+                  size="xs"
+                  variant="ghost"
+                  className="!size-6 shrink-0 !p-0"
+                  aria-label={w(inspectorCollapsed ? "expandDetails" : "collapseDetails")}
+                  title={w(inspectorCollapsed ? "expandDetails" : "collapseDetails")}
+                  onClick={() => inspectorCollapsed
+                    ? inspectorLayout.panelRef.current?.expand()
+                    : inspectorLayout.panelRef.current?.collapse()}
+                >
+                  {inspectorCollapsed
+                    ? <ChevronLeft aria-hidden="true" className="size-4" />
+                    : <ChevronRight aria-hidden="true" className="size-4" />}
+                </Button>
+              </div>
+              {!inspectorCollapsed && <>
               {node ? (
                 <>
                   <h3>{node.nodeName || node.nodeId}</h3>
@@ -410,16 +505,11 @@ export function WorkflowInstances({
                     <dt>{w("finished")}</dt>
                     <dd>{node.finishedTime ?? "—"}</dd>
                   </dl>
-                  <details>
-                    <summary>{w("params")}</summary>
-                    <pre>{node.nodeParams ?? "—"}</pre>
-                  </details>
-                  <details>
-                    <summary>
-                      {w(node.nodeType === 2 ? "branchResult" : "result")}
-                    </summary>
-                    <pre>{node.result ?? "—"}</pre>
-                  </details>
+                  <DetailDisclosure label={w("params")} value={node.nodeParams} />
+                  <DetailDisclosure
+                    label={w(node.nodeType === 2 ? "branchResult" : "result")}
+                    value={node.result}
+                  />
                   {node.nodeType === 3 && node.instanceId && (
                     <Button
                       type="button"
@@ -474,9 +564,17 @@ export function WorkflowInstances({
               ) : (
                 <p>{w("selectNode")}</p>
               )}
+              </>}
             </aside>
+                </ResizablePanel>
+              </ResizablePanelGroup>
+            )}
           </div>
         </>
+      )}
+            </div>
+          </ResizablePanel>
+        </ResizablePanelGroup>
       )}
       {showTask && node?.instanceId && (
         <InstanceDialog
