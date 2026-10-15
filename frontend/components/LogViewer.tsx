@@ -121,15 +121,16 @@ export function LogViewer({
       ? t("logPage", { current: nextIndex, total: totalPages })
       : t("logComplete");
   return (
-    <div className="logs-pane">
-      <div className="flex items-center p-1 gap-2  ">
-        <strong>{t("instanceLogs")}</strong>
-        <span className="muted">{instanceId ? `#${instanceId}` : ""}</span>
-        <span className="muted log-state">{state}</span>
-        <div className="log-controls">
+    <div className="logs-pane @container">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 p-1">
+        <strong className="shrink-0">{t("instanceLogs")}</strong>
+        <span className="muted min-w-0 max-w-full truncate">
+          {instanceId ? `#${instanceId}` : ""}
+        </span>
+        <span className="muted log-state min-w-0">{state}</span>
+        <div className="log-controls w-full flex-wrap @min-[560px]:w-auto">
           <Button
             size="xs"
-
             type="button"
             variant="ghost"
             disabled={!lines.length}
@@ -213,19 +214,19 @@ export function LogViewer({
           >
             {t("exportAllLogs")}
           </Button>
+          {failed && (
+            <Button
+              size="xs"
+              type="button"
+              variant="ghost"
+              onClick={() =>
+                void (nextIndex === 0 || more ? loadNext() : refreshLatest())
+              }
+            >
+              {t("retry")}
+            </Button>
+          )}
         </div>
-        {failed && (
-          <Button
-            size="xs"
-            type="button"
-            variant="ghost"
-            onClick={() =>
-              void (nextIndex === 0 || more ? loadNext() : refreshLatest())
-            }
-          >
-            {t("retry")}
-          </Button>
-        )}
       </div>
       <div
         ref={scroll}
