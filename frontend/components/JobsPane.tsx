@@ -4,7 +4,7 @@ import { Input } from "./ui/input";
 import { label } from "../format";
 import type { Locale, TranslationKey } from "../i18n";
 import type { LatestJobInstanceMap } from "../tasks/useLatestJobInstances";
-import { InstanceStatusBadge } from "./InstanceStatusBadge";
+import { JobInstanceStatusIcon } from "./JobInstanceStatusIcon";
 import type { Job, Page } from "../types";
 import type { T } from "../uiTypes";
 import { Pager } from "./Pager";
@@ -193,6 +193,7 @@ export function JobsPane({
                 }}
               >
                 <span className="job-main">
+                  <JobInstanceStatusIcon latest={latestInstances[job.id]} locale={locale} t={t} />
                   <span className="job-name">{label(job.jobName)}</span>
                   <span className="job-id">#{job.id}</span>
                 </span>
@@ -207,17 +208,6 @@ export function JobsPane({
                   >
                     {job.enable ? t("enabled") : t("disabled")}
                   </span>
-                </span>
-                <span className="job-latest-instance">
-                  <span>{t("latestInstance")}</span>
-                  {latestInstances[job.id]?.instance ? (
-                    <InstanceStatusBadge value={latestInstances[job.id]!.instance!.status} type="NORMAL" locale={locale} />
-                  ) : (
-                    <span>{t(!latestInstances[job.id] ? "loading" : latestInstances[job.id]?.error ? "latestInstanceFailed" : "noInstanceRecords")}</span>
-                  )}
-                  {latestInstances[job.id]?.instance && latestInstances[job.id]?.error && (
-                    <span className="job-latest-error">{t("latestInstanceUpdateFailed")}</span>
-                  )}
                 </span>
               </Button>
             </div>

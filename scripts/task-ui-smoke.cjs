@@ -95,6 +95,12 @@ const assert = require("node:assert/strict");
     const button = name => frame.getByRole("button", { name, exact: true });
     await frame.waitForFunction(() => document.querySelector("#app-select")?.value === "4");
     await frame.locator(".job-item").first().waitFor();
+    assert(await frame.locator(".job-item").first().evaluate(item => {
+      const main = item.querySelector(".job-main");
+      return main.firstElementChild.matches(".job-instance-status") &&
+        main.firstElementChild.nextElementSibling.matches(".job-name") &&
+        !item.querySelector(".job-latest-instance");
+    }), "instance status must be an icon immediately before the job name");
     await frame.locator(".job-item").filter({ hasText: "Alpha" }).getByText("Running", { exact: true }).waitFor();
     await frame.locator(".job-item").filter({ hasText: "Beta" }).getByText("No instance records", { exact: true }).waitFor();
     if (process.argv.includes("--latest-only")) {

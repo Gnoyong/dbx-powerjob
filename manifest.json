@@ -3,7 +3,7 @@
   "manifest_version": 1,
   "id": "local.powerjob.readonly",
   "name": "PowerJob Workbench",
-  "version": "0.1.31",
+  "version": "0.1.32",
   "publisher": "local",
   "description": "Manage PowerJob jobs and workflows; visually edit DAGs, monitor workflow instances and node logs, and recover failed executions.",
   "icon": "assets/plugin.svg",

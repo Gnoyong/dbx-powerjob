@@ -249,7 +249,10 @@ export default function WorkflowWorkspace({
   }
   return (
     <div className="wf-workspace">
-      <nav className="wf-inline wf-nav" aria-label={w("workflows")}>
+      <nav
+        className="wf-inline wf-nav"
+        aria-label={w("workflows")}
+      >
         {(["definitions", "instances"] as const).map((mode) => (
           <Button
             type="button"
@@ -272,12 +275,18 @@ export default function WorkflowWorkspace({
         {readOnly && <span>{w("readOnly")}</span>}
       </nav>
       {error && (
-        <div role="alert" className="wf-feedback">
+        <div
+          role="alert"
+          className="wf-feedback"
+        >
           {error}
         </div>
       )}
       {message && (
-        <div role="status" className="wf-feedback">
+        <div
+          role="status"
+          className="wf-feedback"
+        >
           {message}
         </div>
       )}
@@ -297,6 +306,7 @@ export default function WorkflowWorkspace({
                     setQuery(keyword);
                   }
                 }}
+                className="h-7 text-sm w-32"
               />
               <Button
                 type="button"
@@ -360,7 +370,11 @@ export default function WorkflowWorkspace({
               ))}
               {!page?.data.length && <p>{w(loading ? "loading" : "empty")}</p>}
             </div>
-            <Pager page={page} onPage={setIndex} t={t} />
+            <Pager
+              page={page}
+              onPage={setIndex}
+              t={t}
+            />
           </aside>
           <section className="wf-definition-detail">
             {definition && (

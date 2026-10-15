@@ -83,9 +83,10 @@ module.exports = async ({ outer, frame, calls, button, failures }) => {
   await outer.setViewportSize({ width: 900, height: 750 });
   assert(await frame.locator(".job-item").evaluateAll(items => items.every(item => {
     const row = item.getBoundingClientRect();
-    const summary = item.querySelector(".job-latest-instance").getBoundingClientRect();
-    return summary.bottom <= row.bottom && summary.right <= row.right;
-  })), "status row must fit inside the job button at narrow widths");
+    const summary = item.querySelector(".job-instance-status").getBoundingClientRect();
+    const name = item.querySelector(".job-name").getBoundingClientRect();
+    return summary.bottom <= row.bottom && summary.right <= name.left;
+  })), "status icon must fit before the job name at narrow widths");
   await outer.screenshot({ path: ".build-temp/latest-jobs.png" });
   assert.deepEqual(failures, []);
   console.log("Latest instance sandbox smoke passed: status/empty/error, retained data/menu/selection, bounded polling, backoff, hidden workspaces/documents, stale connections, current-page scope and search.");
