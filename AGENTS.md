@@ -72,14 +72,7 @@ pnpm build
 git diff --check
 ```
 
-前端改动完成后还应重新打包一个递增版本，供已安装插件替换验证：
-
-```powershell
-node node_modules/@dbx-app/plugin-cli/bin/dbx-plugin.js package .
-```
-
 只有在目标 DBX 宿主中实际点击并确认 RPC 成功后，才能声明端到端验证完成。
-静态检查、生产构建和打包成功只能证明源码与候选包验证通过。
 
 ### 常见故障定位
 
@@ -88,8 +81,7 @@ node node_modules/@dbx-app/plugin-cli/bin/dbx-plugin.js package .
 - 控制台出现 `Ignored call to 'confirm()' ... allow-modals`：移除原生确认框，
   改用项目内受控 `Dialog`。
 - 点击后没有沙箱日志但没有 RPC：检查 React 回调绑定、校验提前返回和忙碌状态。
-- RPC 报 `Method not found`：前端代码可能已更新但 Go sidecar 仍是旧版本；重启开发宿主，
-  或重新打包并安装递增版本。
+- RPC 报 `Method not found`：前端代码可能已更新但 Go sidecar 仍是旧版本。
 
 ### 完成定义
 

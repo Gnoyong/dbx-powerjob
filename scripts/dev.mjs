@@ -1,10 +1,17 @@
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path, { delimiter } from "node:path";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const cli = path.join(root, "node_modules", "@dbx-app", "plugin-cli", "bin", "dbx-plugin.js");
+const manifestVersion = JSON.parse(readFileSync(path.join(root, "manifest.json"), "utf8")).version;
+const backendSource = readFileSync(path.join(root, "backend", "main.go"), "utf8");
+const backendVersions = [...backendSource.matchAll(/^\s*Version:\s*"([^"]+)"\s*,/gm)];
+if (backendVersions.length !== 1 || backendVersions[0][1] !== manifestVersion) {
+  process.stderr.write(`Sidecar version ${backendVersions[0]?.[1] ?? "unknown"} does not match manifest version ${manifestVersion}. Update backend/main.go before running dev.\n`);
+  process.exit(1);
+}
 const env = { ...process.env };
 env.GOCACHE = path.join(root, "backend", ".go-cache");
 mkdirSync(env.GOCACHE, { recursive: true });

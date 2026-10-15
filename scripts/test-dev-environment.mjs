@@ -22,7 +22,7 @@ function verify(env) {
   assert.equal(env.UNRELATED_OPTION, "keep-me");
 }
 vm.runInNewContext(source, {
-  path, delimiter: path.delimiter, fileURLToPath, existsSync, mkdirSync,
+  path, delimiter: path.delimiter, fileURLToPath, existsSync, mkdirSync, readFileSync,
   process: {
     platform: "win32", execPath: process.execPath,
     env: { TEMP: "Z:/unwritable/system-temp", TMP: "Z:/unwritable/system-temp", TMPDIR: "Z:/unwritable/system-temp", GOTMPDIR: "Z:/unwritable/system-temp", GOCACHE: "Z:/unwritable/cache", UNRELATED_OPTION: "keep-me" },
@@ -34,3 +34,23 @@ vm.runInNewContext(source, {
 });
 assert.equal(calls, 2);
 console.log("Windows dev environment regression passed (Go probe and DBX runtime).");
+
+let mismatchMessage = "";
+assert.throws(() => vm.runInNewContext(source, {
+  path, delimiter: path.delimiter, fileURLToPath, existsSync, mkdirSync,
+  readFileSync(filePath, encoding) {
+    const value = readFileSync(filePath, encoding);
+    return String(filePath).endsWith("main.go")
+      ? value.replace(/Version:\s*"[^"]+"/, 'Version: "0.0.0"')
+      : value;
+  },
+  process: {
+    env: {},
+    stderr: { write: message => { mismatchMessage = message; } },
+    exit: code => { throw new Error(`Launcher exited ${code}`); },
+  },
+  spawnSync() { throw new Error("Go must not start with a version mismatch"); },
+  spawn() { throw new Error("DBX must not start with a version mismatch"); },
+}), /Launcher exited 1/);
+assert.match(mismatchMessage, /Sidecar version 0\.0\.0 does not match manifest version/);
+console.log("Sidecar/manifest version mismatch regression passed.");

@@ -330,6 +330,16 @@ const assert = require("node:assert/strict");
     await inspectorHandle.press('ArrowLeft');
     assert(await width('.wf-editor .wf-inspector') > inspectorBefore, 'keyboard should resize definition panel');
     await page.waitForFunction(() => window.__storage.has('local.powerjob.readonly.workflow-list-width') && window.__storage.has('local.powerjob.readonly.workflow-inspector-width'));
+    const savedWidths = await page.evaluate(() => [
+      window.__storage.get('local.powerjob.readonly.workflow-list-width'),
+      window.__storage.get('local.powerjob.readonly.workflow-inspector-width'),
+    ]);
+    await page.getByRole('button', { name: '任务', exact: true }).click();
+    await page.getByRole('button', { name: '工作流', exact: true }).click();
+    await page.getByRole('button', { name: /演示流程/ }).click();
+    await page.locator('.wf-editor .wf-inspector').waitFor();
+    assert(Math.abs(await width('.wf-list') - savedWidths[0]) < 3, 'list width should restore after remount');
+    assert(Math.abs(await width('.wf-editor .wf-inspector') - savedWidths[1]) < 3, 'inspector width should restore after remount');
     await browserPage.setViewportSize({ width: 900, height: 750 });
     assert(await width('.wf-list') >= 179, 'list minimum width');
     assert(await width('.wf-editor .wf-inspector') >= 219, 'inspector minimum width');

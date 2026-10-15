@@ -98,10 +98,13 @@ export async function writeSavedApplication(connectionId: string, selection: Sav
 }
 
 
+const pendingPanelWrites = new Map<string, Promise<void>>();
+
 export async function readPanelSize(
   key: string,
   minimum: number,
 ): Promise<number | null> {
+  await pendingPanelWrites.get(key);
   const storage = await getStorage();
   if (!storage) return null;
   const value = await storage.get(key);
@@ -110,12 +113,22 @@ export async function readPanelSize(
     : null;
 }
 
-export async function writePanelSize(
+export function writePanelSize(
   key: string,
   value: number,
 ): Promise<void> {
-  const storage = await getStorage();
-  if (storage) await storage.set(key, Math.round(value));
+  const write = async () => {
+    const storage = await getStorage();
+    if (storage) await storage.set(key, Math.round(value));
+  };
+  const previous = pendingPanelWrites.get(key);
+  const pending = previous ? previous.catch(() => {}).then(write) : write();
+  pendingPanelWrites.set(key, pending);
+  const clear = () => {
+    if (pendingPanelWrites.get(key) === pending) pendingPanelWrites.delete(key);
+  };
+  void pending.then(clear, clear);
+  return pending;
 }
 
 export function invoke<K extends keyof MethodResult>(

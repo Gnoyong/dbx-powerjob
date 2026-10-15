@@ -50,6 +50,27 @@ test("writes use JSON numbers and surface host failures", async () => {
   await assert.rejects(hostApi.writePanelSize("width", 320), /write failed/);
 });
 
+test("a remounted panel reads after its preceding host write finishes", async () => {
+  let finishWrite;
+  let saved = 250;
+  let reads = 0;
+  window.dbxPlugin = { ready: Promise.resolve(), capabilities: { storage: true }, storage: {
+    set: async (_key, value) => {
+      await new Promise(resolve => { finishWrite = resolve; });
+      saved = value;
+    },
+    get: async () => { reads++; return saved; },
+  } };
+  const write = hostApi.writePanelSize("workflow-width", 340);
+  await Promise.resolve();
+  const read = hostApi.readPanelSize("workflow-width", 240);
+  await Promise.resolve();
+  assert.equal(reads, 0, "restore must not read the old size while a write is pending");
+  finishWrite();
+  await write;
+  assert.equal(await read, 340);
+});
+
 test("application selection uses connection-scoped host JSON storage", async () => {
   const calls = [];
   window.dbxPlugin = { ready: Promise.resolve(), capabilities: { storage: true }, storage: {

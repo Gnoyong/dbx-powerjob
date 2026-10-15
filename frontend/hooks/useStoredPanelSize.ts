@@ -8,7 +8,6 @@ export function useStoredPanelSize(key: string, minimum: number) {
   const currentSize = useRef(0);
   const changed = useRef(false);
   const mounted = useRef(false);
-  const writes = useRef(Promise.resolve());
   const restoreVersion = useRef(0);
   const panelRef = useRef<PanelImperativeHandle | null>(null);
 
@@ -39,14 +38,10 @@ export function useStoredPanelSize(key: string, minimum: number) {
   function persist() {
     const size = currentSize.current;
     if (!Number.isFinite(size) || size < minimum) return;
-    writes.current = writes.current.then(async () => {
-      try {
-        await writePanelSize(key, size);
-        if (mounted.current) setFailed(false);
-      } catch {
-        if (mounted.current) setFailed(true);
-      }
-    });
+    void writePanelSize(key, size).then(
+      () => { if (mounted.current) setFailed(false); },
+      () => { if (mounted.current) setFailed(true); },
+    );
   }
 
   return {
