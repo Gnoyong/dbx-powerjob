@@ -6,13 +6,14 @@ import { useLogs, type LogExportProgress } from "../hooks/useLogs";
 import type { T } from "../uiTypes";
 
 type ExportState =
-  | { status: "idle" }
-  | ({ status: "exporting" } & LogExportProgress);
+  { status: "idle" } | ({ status: "exporting" } & LogExportProgress);
 
 function downloadLog(content: string, instanceId: string) {
-  const url = URL.createObjectURL(new Blob([content], {
-    type: "text/plain;charset=utf-8",
-  }));
+  const url = URL.createObjectURL(
+    new Blob([content], {
+      type: "text/plain;charset=utf-8",
+    }),
+  );
   const link = document.createElement("a");
   link.href = url;
   link.download = `powerjob-instance-${instanceId}.log`;
@@ -170,27 +171,42 @@ export function LogViewer({
               if (exportController.current) return;
               const controller = new AbortController();
               exportController.current = controller;
-              if (exportToast.current !== undefined) toast.dismiss(exportToast.current);
-              const toastId = toast.loading(t("exportingLogs", { current: 0, total: 0 }), { closeButton: false });
+              if (exportToast.current !== undefined)
+                toast.dismiss(exportToast.current);
+              const toastId = toast.loading(
+                t("exportingLogs", { current: 0, total: 0 }),
+                { closeButton: false },
+              );
               exportToast.current = toastId;
               setExportState({ status: "exporting", current: 0, total: 0 });
               try {
                 const exported = await exportAll((progress) => {
                   if (controller.signal.aborted) return;
                   setExportState({ status: "exporting", ...progress });
-                  toast.loading(t("exportingLogs", progress), { id: toastId, closeButton: false });
+                  toast.loading(t("exportingLogs", progress), {
+                    id: toastId,
+                    closeButton: false,
+                  });
                 }, controller.signal);
                 if (controller.signal.aborted) return;
                 downloadLog(exported.content, instanceId);
-                toast.success(t("logsExported", { count: exported.pageCount }), { id: toastId, closeButton: true, duration: 4000 });
+                toast.success(
+                  t("logsExported", { count: exported.pageCount }),
+                  { id: toastId, closeButton: true, duration: 4000 },
+                );
               } catch {
                 if (!controller.signal.aborted) {
-                  toast.error(t("logExportFailed"), { id: toastId, closeButton: true, duration: 8000 });
+                  toast.error(t("logExportFailed"), {
+                    id: toastId,
+                    closeButton: true,
+                    duration: 8000,
+                  });
                 }
               } finally {
                 if (exportController.current === controller) {
                   exportController.current = null;
-                  if (!controller.signal.aborted) setExportState({ status: "idle" });
+                  if (!controller.signal.aborted)
+                    setExportState({ status: "idle" });
                 }
               }
             }}
