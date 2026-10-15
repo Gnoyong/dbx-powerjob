@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { invoke, getHost } from "../host";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -59,6 +60,8 @@ export function WorkflowEditor({
   onGuard: (guard: EditorGuard) => void;
 }) {
   const w = workflowText(locale);
+  const [configExpanded, setConfigExpanded] = useState(true);
+  const configId = useId();
   const inspectorLayout = useStoredPanelSize(
     "local.powerjob.readonly.workflow-inspector-width",
     220,
@@ -314,51 +317,178 @@ export function WorkflowEditor({
     (!!recoverToken && !operation);
   return (
     <div className="wf-editor">
-      <div className="wf-editor-toolbar">
-        <strong>
-          {draft.config.wfName || w("newWorkflow")}
-          {dirty ? ` · ${w("unsaved")}` : ""}
-        </strong>
-        <Button
-          type="button"
-          size="xs"
-          variant="secondary"
-          disabled={busy || readOnly || editing}
-          onClick={() => setEditing(true)}
+      <section className="wf-definition-config" aria-label={w("definitions")}>
+        <div className="flex">
+          <Button
+            type="button"
+            size="xs"
+            variant="ghost"
+            className="wf-definition-toggle"
+            aria-expanded={configExpanded}
+            aria-controls={configId}
+            onClick={() => setConfigExpanded((value) => !value)}
+          >
+            {configExpanded ? (
+              <ChevronDown data-icon="inline-start" aria-hidden="true" />
+            ) : (
+              <ChevronRight data-icon="inline-start" aria-hidden="true" />
+            )}
+            {w("definitions")}
+          </Button>
+        </div>
+        <div
+          id={configId}
+          hidden={!configExpanded}
+          className="wf-definition-body"
         >
-          {w("edit")}
-        </Button>
-        {editing && (
-          <>
-            <Button
-              type="button"
-              size="xs"
-              disabled={locked}
-              onClick={() => void save()}
-            >
-              {w("save")}
-            </Button>
-            <Button
-              type="button"
-              size="xs"
-              variant="ghost"
-              disabled={locked || !undo.length}
-              onClick={undoDraft}
-            >
-              {w("undo")}
-            </Button>
-            <Button
-              type="button"
-              size="xs"
-              variant="ghost"
-              disabled={locked || !redo.length}
-              onClick={redoDraft}
-            >
-              {w("redo")}
-            </Button>
-          </>
-        )}
-      </div>
+          <fieldset
+            disabled={locked}
+            className="wf-fieldset wf-definition-fields"
+          >
+            <legend className="sr-only">{w("definitions")}</legend>
+            <label>
+              {w("name")}
+              <Input
+                value={draft.config.wfName}
+                onChange={(e) =>
+                  commit({
+                    ...draft,
+                    config: { ...draft.config, wfName: e.target.value },
+                  })
+                }
+              />
+            </label>
+            <label>
+              {w("description")}
+              <textarea
+                rows={2}
+                value={draft.config.wfDescription ?? ""}
+                onChange={(e) =>
+                  commit({
+                    ...draft,
+                    config: {
+                      ...draft.config,
+                      wfDescription: e.target.value,
+                    },
+                  })
+                }
+              />
+            </label>
+            <label>
+              {w("schedule")}
+              <NativeSelect
+                value={draft.config.timeExpressionType}
+                onChange={(e) =>
+                  commit({
+                    ...draft,
+                    config: {
+                      ...draft.config,
+                      timeExpressionType: e.target.value,
+                    },
+                  })
+                }
+              >
+                <NativeSelectOption value="API">API</NativeSelectOption>
+                <NativeSelectOption value="CRON">CRON</NativeSelectOption>
+                {!["API", "CRON"].includes(draft.config.timeExpressionType) && (
+                  <NativeSelectOption value={draft.config.timeExpressionType}>
+                    {draft.config.timeExpressionType}
+                  </NativeSelectOption>
+                )}
+              </NativeSelect>
+            </label>
+            {draft.config.timeExpressionType !== "API" && (
+              <label>
+                {w("cron")}
+                <Input
+                  value={draft.config.timeExpression ?? ""}
+                  onChange={(e) =>
+                    commit({
+                      ...draft,
+                      config: {
+                        ...draft.config,
+                        timeExpression: e.target.value,
+                      },
+                    })
+                  }
+                />
+              </label>
+            )}
+            <label>
+              {w("concurrency")}
+              <Input
+                type="number"
+                min={1}
+                value={draft.config.maxWfInstanceNum}
+                onChange={(e) =>
+                  commit({
+                    ...draft,
+                    config: {
+                      ...draft.config,
+                      maxWfInstanceNum: Number(e.target.value),
+                    },
+                  })
+                }
+              />
+            </label>
+            <label className="wf-check">
+              <input
+                type="checkbox"
+                checked={draft.config.enable}
+                onChange={(e) =>
+                  commit({
+                    ...draft,
+                    config: { ...draft.config, enable: e.target.checked },
+                  })
+                }
+              />
+              {w("enabled")}
+            </label>
+            {(["start", "end"] as const).map((key) => (
+              <label key={key}>
+                {w(key === "start" ? "lifecycleStart" : "lifecycleEnd")}
+                <Input
+                  type="datetime-local"
+                  value={localDate(draft.config.lifeCycle?.[key])}
+                  onChange={(e) =>
+                    commit({
+                      ...draft,
+                      config: {
+                        ...draft.config,
+                        lifeCycle: {
+                          ...draft.config.lifeCycle,
+                          [key]: e.target.value
+                            ? new Date(e.target.value).getTime()
+                            : null,
+                        },
+                      },
+                    })
+                  }
+                />
+              </label>
+            ))}
+            <label>
+              {w("notify")}
+              <Input
+                value={draft.config.notifyUserIds?.join(",") ?? ""}
+                onChange={(e) =>
+                  commit({
+                    ...draft,
+                    config: {
+                      ...draft.config,
+                      notifyUserIds: e.target.value
+                        .split(",")
+                        .map((id) => id.trim())
+                        .filter(Boolean),
+                    },
+                  })
+                }
+              />
+            </label>
+          </fieldset>
+        </div>
+      </section>
+
       {error && (
         <div role="alert" className="wf-feedback">
           {error}
@@ -447,32 +577,85 @@ export function WorkflowEditor({
           >
             <ResizablePanel id="workflow-graph-panel" minSize={320}>
               <div className="wf-editor-graph">
-                <div className="wf-inline wf-add-bar">
-                  {([1, 2, 3] as const).map((kind) => (
-                    <Button
-                      type="button"
-                      size="xs"
-                      variant="secondary"
-                      key={kind}
-                      disabled={locked}
-                      onClick={() => {
-                        const node = newDraftNode(kind);
-                        commit({ ...draft, nodes: [...draft.nodes, node] });
-                        setSelected(node.key);
-                      }}
-                    >
-                      {w("add")} ·{" "}
-                      {w(
-                        kind === 1
-                          ? "task"
-                          : kind === 2
-                            ? "decision"
-                            : "nested",
-                      )}
-                    </Button>
-                  ))}
-                </div>
                 <WorkflowCanvas
+                  toolbar={
+                    <>
+                      <div className="wf-toolbar-group wf-editor-toolbar">
+                        {dirty && (
+                          <span className="wf-toolbar-status">
+                            {w("unsaved")}
+                          </span>
+                        )}
+                        <Button
+                          type="button"
+                          size="xs"
+                          variant="secondary"
+                          disabled={busy || readOnly || editing}
+                          onClick={() => setEditing(true)}
+                        >
+                          {w("edit")}
+                        </Button>
+                        {editing && (
+                          <>
+                            <Button
+                              type="button"
+                              size="xs"
+                              disabled={locked}
+                              onClick={() => void save()}
+                            >
+                              {w("save")}
+                            </Button>
+                            <Button
+                              type="button"
+                              size="xs"
+                              variant="ghost"
+                              disabled={locked || !undo.length}
+                              onClick={undoDraft}
+                            >
+                              {w("undo")}
+                            </Button>
+                            <Button
+                              type="button"
+                              size="xs"
+                              variant="ghost"
+                              disabled={locked || !redo.length}
+                              onClick={redoDraft}
+                            >
+                              {w("redo")}
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                      <div className="wf-toolbar-group wf-add-bar">
+                        {([1, 2, 3] as const).map((kind) => (
+                          <Button
+                            type="button"
+                            size="xs"
+                            variant="secondary"
+                            key={kind}
+                            disabled={locked}
+                            onClick={() => {
+                              const node = newDraftNode(kind);
+                              commit({
+                                ...draft,
+                                nodes: [...draft.nodes, node],
+                              });
+                              setSelected(node.key);
+                            }}
+                          >
+                            {w("add")} ·{" "}
+                            {w(
+                              kind === 1
+                                ? "task"
+                                : kind === 2
+                                  ? "decision"
+                                  : "nested",
+                            )}
+                          </Button>
+                        ))}
+                      </div>
+                    </>
+                  }
                   draft={draft}
                   locale={locale}
                   editable={!locked}
@@ -493,152 +676,6 @@ export function WorkflowEditor({
               groupResizeBehavior="preserve-pixel-size"
             >
               <aside className="wf-inspector">
-                <fieldset disabled={locked} className="wf-fieldset">
-                  <legend>{w("definitions")}</legend>
-                  <label>
-                    {w("name")}
-                    <Input
-                      value={draft.config.wfName}
-                      onChange={(e) =>
-                        commit({
-                          ...draft,
-                          config: { ...draft.config, wfName: e.target.value },
-                        })
-                      }
-                    />
-                  </label>
-                  <label>
-                    {w("description")}
-                    <textarea
-                      rows={2}
-                      value={draft.config.wfDescription ?? ""}
-                      onChange={(e) =>
-                        commit({
-                          ...draft,
-                          config: {
-                            ...draft.config,
-                            wfDescription: e.target.value,
-                          },
-                        })
-                      }
-                    />
-                  </label>
-                  <label>
-                    {w("schedule")}
-                    <NativeSelect
-                      value={draft.config.timeExpressionType}
-                      onChange={(e) =>
-                        commit({
-                          ...draft,
-                          config: {
-                            ...draft.config,
-                            timeExpressionType: e.target.value,
-                          },
-                        })
-                      }
-                    >
-                      <NativeSelectOption value="API">API</NativeSelectOption>
-                      <NativeSelectOption value="CRON">CRON</NativeSelectOption>
-                      {!["API", "CRON"].includes(
-                        draft.config.timeExpressionType,
-                      ) && (
-                        <NativeSelectOption
-                          value={draft.config.timeExpressionType}
-                        >
-                          {draft.config.timeExpressionType}
-                        </NativeSelectOption>
-                      )}
-                    </NativeSelect>
-                  </label>
-                  {draft.config.timeExpressionType !== "API" && (
-                    <label>
-                      {w("cron")}
-                      <Input
-                        value={draft.config.timeExpression ?? ""}
-                        onChange={(e) =>
-                          commit({
-                            ...draft,
-                            config: {
-                              ...draft.config,
-                              timeExpression: e.target.value,
-                            },
-                          })
-                        }
-                      />
-                    </label>
-                  )}
-                  <label>
-                    {w("concurrency")}
-                    <Input
-                      type="number"
-                      min={1}
-                      value={draft.config.maxWfInstanceNum}
-                      onChange={(e) =>
-                        commit({
-                          ...draft,
-                          config: {
-                            ...draft.config,
-                            maxWfInstanceNum: Number(e.target.value),
-                          },
-                        })
-                      }
-                    />
-                  </label>
-                  <label className="wf-check">
-                    <input
-                      type="checkbox"
-                      checked={draft.config.enable}
-                      onChange={(e) =>
-                        commit({
-                          ...draft,
-                          config: { ...draft.config, enable: e.target.checked },
-                        })
-                      }
-                    />
-                    {w("enabled")}
-                  </label>
-                  {(["start", "end"] as const).map((key) => (
-                    <label key={key}>
-                      {w(key === "start" ? "lifecycleStart" : "lifecycleEnd")}
-                      <Input
-                        type="datetime-local"
-                        value={localDate(draft.config.lifeCycle?.[key])}
-                        onChange={(e) =>
-                          commit({
-                            ...draft,
-                            config: {
-                              ...draft.config,
-                              lifeCycle: {
-                                ...draft.config.lifeCycle,
-                                [key]: e.target.value
-                                  ? new Date(e.target.value).getTime()
-                                  : null,
-                              },
-                            },
-                          })
-                        }
-                      />
-                    </label>
-                  ))}
-                  <label>
-                    {w("notify")}
-                    <Input
-                      value={draft.config.notifyUserIds?.join(",") ?? ""}
-                      onChange={(e) =>
-                        commit({
-                          ...draft,
-                          config: {
-                            ...draft.config,
-                            notifyUserIds: e.target.value
-                              .split(",")
-                              .map((id) => id.trim())
-                              .filter(Boolean),
-                          },
-                        })
-                      }
-                    />
-                  </label>
-                </fieldset>
                 {active ? (
                   <NodeEditor
                     key={active.key}

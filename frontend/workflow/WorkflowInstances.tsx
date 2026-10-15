@@ -207,7 +207,10 @@ export function WorkflowInstances({
         >
           <NativeSelectOption value="">{t("allStatuses")}</NativeSelectOption>
           {["WAITING", "RUNNING", "FAILED", "SUCCEED", "STOPPED"].map((s) => (
-            <NativeSelectOption key={s} value={s}>
+            <NativeSelectOption
+              key={s}
+              value={s}
+            >
               {statusLabel(s, "WORKFLOW_INSTANCE", locale)}
             </NativeSelectOption>
           ))}
@@ -234,7 +237,10 @@ export function WorkflowInstances({
         </Button>
       </div>
       {error && (
-        <p role="alert" className="wf-feedback">
+        <p
+          role="alert"
+          className="wf-feedback"
+        >
           {error}
         </p>
       )}
@@ -299,14 +305,24 @@ export function WorkflowInstances({
           </tbody>
         </table>
       </div>
-      <Pager page={page} onPage={setIndex} t={t} />
+      <Pager
+        page={page}
+        onPage={setIndex}
+        t={t}
+      />
       {detailError && (
-        <p role="alert" className="wf-feedback">
+        <p
+          role="alert"
+          className="wf-feedback"
+        >
           {detailError}
         </p>
       )}
       {actionMessage && (
-        <p role="status" className="wf-feedback">
+        <p
+          role="status"
+          className="wf-feedback"
+        >
           {actionMessage}
         </p>
       )}

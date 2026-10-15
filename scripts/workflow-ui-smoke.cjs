@@ -271,6 +271,35 @@ const assert = require("node:assert/strict");
     await page.getByText("清洗数据", { exact: true }).last().waitFor();
     assert.equal(await page.locator('.wf-nav').count(), 0, 'global workflow tabs should be removed');
     assert.equal(await page.getByRole('tab', { name: '编排', exact: true }).count(), 1);
+    const configToggle = page.getByRole('button', { name: '定义与编排', exact: true });
+    assert.equal(await configToggle.count(), 1, 'workflow configuration has a collapse control');
+    assert.equal(await configToggle.getAttribute('aria-expanded'), 'true');
+    const configBox = await page.locator('.wf-definition-config').boundingBox();
+    const actionsBox = await page.locator('.wf-editor-toolbar').boundingBox();
+    assert(configBox.y + configBox.height <= actionsBox.y + 1, 'configuration must be above orchestration actions');
+    const expandedCanvasHeight = await page.locator('.workflow-canvas').evaluate(el => el.getBoundingClientRect().height);
+    const toolbarLayout = await page.locator('.wf-editor .wf-canvas-toolbar').evaluate(el => {
+      const groups = [...el.querySelectorAll('.wf-toolbar-group')];
+      return { rows: groups.map(group => Math.round(group.getBoundingClientRect().top)), gap: getComputedStyle(el).gap, innerGap: getComputedStyle(groups[0]).gap };
+    });
+    assert.equal(new Set(toolbarLayout.rows).size, 1, 'canvas actions stay in one row');
+    assert(Number.parseFloat(toolbarLayout.gap) > Number.parseFloat(toolbarLayout.innerGap), 'larger gaps separate action categories');
+    await configToggle.click();
+    assert.equal(await page.getByRole('textbox', { name: '名称', exact: true }).isVisible(), false);
+    assert(await page.locator('.workflow-canvas').evaluate(el => el.getBoundingClientRect().height) > expandedCanvasHeight, 'collapse releases canvas space');
+    await configToggle.focus();
+    await configToggle.press('Enter');
+    assert.equal(await configToggle.getAttribute('aria-expanded'), 'true');
+    assert.equal(await page.locator('.wf-editor').getByRole('button', { name: '运行', exact: true }).count(), 0);
+    const otherWorkflow = page.getByRole('button', { name: /另一个流程/ });
+    await otherWorkflow.focus();
+    await otherWorkflow.press('Shift+F10');
+    assert.equal(await page.getByRole('menuitem').count(), 4);
+    await page.getByRole('menuitem', { name: '运行', exact: true }).click();
+    await page.getByRole('dialog').getByRole('button', { name: '取消', exact: true }).click();
+    assert.equal(await page.evaluate(() => window.__calls.filter(c => c.method === 'powerjob/runWorkflow').length), 0);
+    await page.getByRole('button', { name: /演示流程/ }).click();
+    await page.getByRole('textbox', { name: '名称', exact: true }).waitFor();
     assert.equal(await page.locator(".react-flow__node").count(), 2);
     const density = await page.evaluate(() => {
       const style = (selector) => getComputedStyle(document.querySelector(selector));
@@ -287,7 +316,7 @@ const assert = require("node:assert/strict");
       metaFont: '11px', buttonHeight: '28px',
     }, 'workflow controls should match Jobs density');
     const listHandle = page.getByRole('separator', { name: '调整工作流列表与详情宽度' });
-    const inspectorHandle = page.getByRole('separator', { name: '调整画布与定义编排区域宽度' });
+    const inspectorHandle = page.getByRole('separator', { name: '调整画布与节点属性区域宽度' });
     const width = (selector) => page.locator(selector).evaluate(el => el.getBoundingClientRect().width);
     const listBefore = await width('.wf-list');
     const handleBox = await listHandle.boundingBox();
@@ -316,6 +345,14 @@ const assert = require("node:assert/strict");
     await page
       .getByRole("textbox", { name: "名称", exact: true })
       .fill("更新后的流程");
+    await otherWorkflow.click({ button: 'right' });
+    await page.getByRole('menuitem', { name: '删除', exact: true }).click();
+    await page.getByRole('button', { name: '继续编辑', exact: true }).click();
+    assert.equal(await page.getByRole('textbox', { name: '名称', exact: true }).inputValue(), '更新后的流程');
+    assert.equal(await page.evaluate(() => window.__calls.filter(c => c.method === 'powerjob/deleteWorkflow').length), 0);
+    await configToggle.click();
+    await configToggle.click();
+    assert.equal(await page.getByRole('textbox', { name: '名称', exact: true }).inputValue(), '更新后的流程', 'collapse preserves draft values');
     await page
       .locator(".react-flow__node")
       .filter({ hasText: "清洗数据" })
@@ -416,7 +453,8 @@ const assert = require("node:assert/strict");
     const pollCount = await page.evaluate(() => window.__calls.filter(c => c.method === 'powerjob/workflowInstances').length);
     await browserPage.waitForTimeout(3200);
     assert.equal(await page.evaluate(() => window.__calls.filter(c => c.method === 'powerjob/workflowInstances').length), pollCount, 'hidden instances must stop polling');
-    await page.getByRole('button', { name: '运行', exact: true }).click();
+    await page.getByRole('button', { name: /更新后的流程/ }).click({ button: 'right' });
+    await page.getByRole('menuitem', { name: '运行', exact: true }).click();
     await page.getByRole('dialog').getByRole('button', { name: '运行', exact: true }).click();
     await page.locator('.wf-instance-actions').waitFor();
     assert.equal(await page.getByRole('tab', { name: '实例', exact: true }).getAttribute('aria-selected'), 'true');
@@ -493,7 +531,7 @@ const assert = require("node:assert/strict");
           .length === 2,
     );
     await page.getByText("工作流已保存", { exact: true }).waitFor();
-    await page.locator(".wf-definition-actions").waitFor();
+    await page.locator(".wf-editor-toolbar").waitFor();
     assert.equal(
       await page
         .getByRole("textbox", { name: "名称", exact: true })

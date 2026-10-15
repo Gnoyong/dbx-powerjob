@@ -16,6 +16,7 @@ import {
   type Viewport,
 } from "@xyflow/react";
 import dagre from "@dagrejs/dagre";
+import type { ReactNode } from "react";
 import { getHost } from "../host";
 import { statusLabel, statusTone } from "../format";
 import { Button } from "../components/ui/button";
@@ -108,6 +109,7 @@ export function WorkflowCanvas({
   onChange,
   onSelect,
   selectedKey,
+  toolbar,
 }: {
   draft: WorkflowDraft;
   runtime?: WorkflowNode[];
@@ -117,6 +119,7 @@ export function WorkflowCanvas({
   onChange?: (draft: WorkflowDraft, record?: boolean) => void;
   onSelect: (key: string) => void;
   selectedKey: string;
+  toolbar?: ReactNode;
 }) {
   const w = workflowText(locale);
   const [nodes, setNodes] = useState<FlowNode[]>([]);
@@ -274,22 +277,25 @@ export function WorkflowCanvas({
   return (
     <section className="wf-canvas-section" aria-label={w("definitions")}>
       <div className="wf-canvas-toolbar">
-        <Button
-          type="button"
-          size="xs"
-          variant="secondary"
-          onClick={() => layout("LR")}
-        >
-          {w("layout")} · {w("horizontal")}
-        </Button>
-        <Button
-          type="button"
-          size="xs"
-          variant="secondary"
-          onClick={() => layout("TB")}
-        >
-          {w("vertical")}
-        </Button>
+        {toolbar}
+        <div className="wf-toolbar-group">
+          <Button
+            type="button"
+            size="xs"
+            variant="secondary"
+            onClick={() => layout("LR")}
+          >
+            {w("layout")} · {w("horizontal")}
+          </Button>
+          <Button
+            type="button"
+            size="xs"
+            variant="secondary"
+            onClick={() => layout("TB")}
+          >
+            {w("vertical")}
+          </Button>
+        </div>
         <Input
           aria-label={w("findNode")}
           placeholder={w("findNode")}

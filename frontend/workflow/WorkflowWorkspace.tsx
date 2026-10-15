@@ -19,6 +19,7 @@ import { workflowText } from "./i18n";
 import { WorkflowEditor, type EditorGuard } from "./WorkflowEditor";
 import { WorkflowInstances } from "./WorkflowInstances";
 import type { WorkflowDefinition } from "./types";
+import { WorkflowContextMenu, type WorkflowMenu } from "./WorkflowContextMenu";
 
 export default function WorkflowWorkspace({
   connectionId,
@@ -34,6 +35,10 @@ export default function WorkflowWorkspace({
   registerNavigation: (guard: ((action: () => void) => void) | null) => void;
 }) {
   const w = workflowText(locale);
+  const [menu, setMenu] = useState<WorkflowMenu | null>(null);
+  const [actionWorkflow, setActionWorkflow] =
+    useState<WorkflowDefinition | null>(null);
+  const closeMenu = useCallback(() => setMenu(null), []);
   const listLayout = useStoredPanelSize(
     "local.powerjob.readonly.workflow-list-width",
     180,
@@ -75,6 +80,19 @@ export default function WorkflowWorkspace({
   const [delay, setDelay] = useState("0");
   const [message, setMessage] = useState("");
   const mounted = useRef(true);
+  useEffect(
+    () => setMenu(null),
+    [page, selected, connectionId, appId, busy, tab],
+  );
+  function openMenu(
+    row: WorkflowDefinition,
+    trigger: HTMLButtonElement,
+    x: number,
+    y: number,
+  ) {
+    if (actionPending.current || guard.current?.busy) return;
+    setMenu({ workflow: row, trigger, x, y });
+  }
   useEffect(() => {
     mounted.current = true;
     return () => {
@@ -194,7 +212,7 @@ export default function WorkflowWorkspace({
     [selected, locale],
   );
   async function perform() {
-    if (!definition || !action || actionPending.current || readOnly) return;
+    if (!actionWorkflow || !action || actionPending.current || readOnly) return;
     const target = action;
     actionPending.current = true;
     setBusy(true);
@@ -204,14 +222,14 @@ export default function WorkflowWorkspace({
         if (!/^\d+$/.test(delay)) throw new Error(w("delay"));
         const result = await invoke(connectionId, "powerjob/runWorkflow", {
           appId,
-          workflowId: definition.id,
+          workflowId: actionWorkflow.id,
           initParams: params,
           delay,
         });
         if (mounted.current) {
           guard.current = null;
           setInstanceTarget({
-            workflowId: definition.id,
+            workflowId: actionWorkflow.id,
             instanceId: result.wfInstanceId,
           });
           setTab("instances");
@@ -219,7 +237,7 @@ export default function WorkflowWorkspace({
       } else if (target === "copy") {
         const result = await invoke(connectionId, "powerjob/copyWorkflow", {
           appId,
-          workflowId: definition.id,
+          workflowId: actionWorkflow.id,
         });
         if (mounted.current) {
           openDefinition(result.id);
@@ -228,7 +246,7 @@ export default function WorkflowWorkspace({
       } else if (target === "delete") {
         await invoke(connectionId, "powerjob/deleteWorkflow", {
           appId,
-          workflowId: definition.id,
+          workflowId: actionWorkflow.id,
         });
         if (mounted.current) {
           setSelected("");
@@ -240,7 +258,11 @@ export default function WorkflowWorkspace({
         const result = await invoke(
           connectionId,
           "powerjob/setWorkflowEnabled",
-          { appId, workflowId: definition.id, enabled: target === "enable" },
+          {
+            appId,
+            workflowId: actionWorkflow.id,
+            enabled: target === "enable",
+          },
         );
         if (mounted.current) {
           setDefinition(result);
@@ -365,6 +387,34 @@ export default function WorkflowWorkspace({
                       key={row.id}
                       className={`wf-list-item ${selected === row.id ? "active" : ""}`}
                       onClick={() => navigate(() => openDefinition(row.id))}
+                      aria-haspopup="menu"
+                      aria-expanded={menu?.workflow.id === row.id}
+                      title={`${row.wfName} · ${t("jobContextHint")}`}
+                      onContextMenu={(event) => {
+                        event.preventDefault();
+                        openMenu(
+                          row,
+                          event.currentTarget,
+                          event.clientX,
+                          event.clientY,
+                        );
+                      }}
+                      onKeyDown={(event) => {
+                        if (
+                          event.key === "ContextMenu" ||
+                          (event.shiftKey && event.key === "F10")
+                        ) {
+                          event.preventDefault();
+                          const rect =
+                            event.currentTarget.getBoundingClientRect();
+                          openMenu(
+                            row,
+                            event.currentTarget,
+                            rect.left + 12,
+                            rect.bottom,
+                          );
+                        }
+                      }}
                     >
                       <strong>{row.wfName}</strong>
                       <small>
@@ -461,35 +511,6 @@ export default function WorkflowWorkspace({
                 >
                   {tab === "definitions" ? (
                     <>
-                      {definition && (
-                        <div className="wf-inline wf-definition-actions">
-                          {(
-                            [
-                              "run",
-                              "copy",
-                              definition.enable ? "disable" : "enable",
-                              "delete",
-                            ] as const
-                          ).map((kind) => (
-                            <Button
-                              type="button"
-                              size="xs"
-                              variant="secondary"
-                              disabled={busy || readOnly || !capabilitiesReady}
-                              key={kind}
-                              onClick={() =>
-                                navigate(() => {
-                                  setAction(kind);
-                                  setParams("");
-                                  setDelay("0");
-                                })
-                              }
-                            >
-                              {w(kind)}
-                            </Button>
-                          ))}
-                        </div>
-                      )}
                       {creating || definition ? (
                         <WorkflowEditor
                           key={`${creating ? "new" : definition?.id}:${editorEpoch}`}
@@ -538,6 +559,23 @@ export default function WorkflowWorkspace({
           </ResizablePanelGroup>
         )}
       </div>
+      {menu && (
+        <WorkflowContextMenu
+          menu={menu}
+          locale={locale}
+          disabled={busy || readOnly || !capabilitiesReady}
+          onClose={closeMenu}
+          onAction={(kind, row) =>
+            navigate(() => {
+              if (selected !== row.id || creating) openDefinition(row.id);
+              setActionWorkflow(row);
+              setAction(kind);
+              setParams("");
+              setDelay("0");
+            })
+          }
+        />
+      )}
       {leave && (
         <Dialog
           open
@@ -593,7 +631,9 @@ export default function WorkflowWorkspace({
           }}
         >
           <DialogContent className="run-job-dialog">
-            <DialogTitle>{w("run")}</DialogTitle>
+            <DialogTitle>
+              {w("run")} · {actionWorkflow?.wfName}
+            </DialogTitle>
             <p>{w("runWarning")}</p>
             <label>
               {w("initParams")}
@@ -639,7 +679,7 @@ export default function WorkflowWorkspace({
       )}
       {action && action !== "run" && (
         <ConfirmActionDialog
-          title={w(action)}
+          title={`${w(action)} · ${actionWorkflow?.wfName ?? ""}`}
           message={w(
             action === "delete"
               ? "deleteWarning"

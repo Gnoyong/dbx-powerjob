@@ -58,7 +58,7 @@
       "id": "releaseVersion",
       "type": "promptString",
       "description": "请输入新版本号（不含 v）",
-      "default": "0.1.35"
+      "default": "0.1.38"
     }
   ]
 }
