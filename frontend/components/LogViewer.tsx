@@ -49,7 +49,9 @@ export function LogViewer({
   const autoFill = useRef(0);
   const exportController = useRef<AbortController | null>(null);
   const exportToast = useRef<string | number | undefined>(undefined);
-  const [followLatest, setFollowLatest] = useState(false);
+  const [scrollMode, setScrollMode] = useState<"idle" | "bottom" | "follow">("idle");
+  const followLatest = scrollMode === "follow";
+  const seekingBottom = scrollMode !== "idle";
   const [exportState, setExportState] = useState<ExportState>({
     status: "idle",
   });
@@ -75,13 +77,13 @@ export function LogViewer({
     exportController.current = null;
     autoFill.current = 0;
     if (scroll.current) scroll.current.scrollTop = 0;
-    setFollowLatest(false);
+    setScrollMode("idle");
     setExportState({ status: "idle" });
     return () => {
       exportController.current?.abort();
       if (exportToast.current !== undefined) toast.dismiss(exportToast.current);
     };
-  }, [instanceId, appId]);
+  }, [connectionId, instanceId, appId]);
   useEffect(() => {
     if (!more || loading || failed || autoFill.current >= 4) return;
     const frame = requestAnimationFrame(() => {
@@ -94,8 +96,14 @@ export function LogViewer({
     return () => cancelAnimationFrame(frame);
   }, [pages, more, loading, failed, loadNext]);
   useEffect(() => {
-    if (followLatest && more && !loading && !failed) void loadNext();
-  }, [followLatest, more, loading, failed, loadNext]);
+    // Page progress must drive this too: fast responses can batch loading=true
+    // and loading=false into one render, leaving the other dependencies unchanged.
+    if (!seekingBottom || !more || loading || failed) return;
+    // Yield between pages so immediate replies cannot form a nested React update
+    // chain, and navigation/manual browsing can cancel before the next request.
+    const timer = window.setTimeout(() => void loadNext(), 0);
+    return () => window.clearTimeout(timer);
+  }, [seekingBottom, nextIndex, more, loading, failed, loadNext]);
   useEffect(() => {
     if (!followLatest || more || loading || failed || totalPages === null)
       return;
@@ -103,10 +111,14 @@ export function LogViewer({
     return () => window.clearInterval(timer);
   }, [followLatest, more, loading, failed, totalPages, refreshLatest]);
   useEffect(() => {
-    if (!followLatest) return;
-    const frame = requestAnimationFrame(scrollToBottom);
+    if (!seekingBottom) return;
+    const frame = requestAnimationFrame(() => {
+      scrollToBottom();
+      if (scrollMode === "bottom" && totalPages !== null && !more && !loading && !failed)
+        setScrollMode("idle");
+    });
     return () => cancelAnimationFrame(frame);
-  }, [followLatest, content, totalSize]);
+  }, [seekingBottom, scrollMode, content, totalSize, totalPages, more, loading, failed]);
 
   let state = "";
   if (exportState.status === "exporting")
@@ -135,7 +147,7 @@ export function LogViewer({
             variant="ghost"
             disabled={!lines.length}
             onClick={() => {
-              setFollowLatest(false);
+              setScrollMode("idle");
               if (scroll.current) scroll.current.scrollTop = 0;
             }}
           >
@@ -146,7 +158,10 @@ export function LogViewer({
             type="button"
             variant="ghost"
             disabled={!lines.length}
-            onClick={scrollToBottom}
+            onClick={() => {
+              if (!followLatest) setScrollMode("bottom");
+              scrollToBottom();
+            }}
           >
             {t("logToBottom")}
           </Button>
@@ -157,7 +172,7 @@ export function LogViewer({
             disabled={!instanceId}
             aria-pressed={followLatest}
             onClick={() => {
-              setFollowLatest((current) => !current);
+              setScrollMode(followLatest ? "idle" : "follow");
               if (!followLatest) scrollToBottom();
             }}
           >
@@ -232,16 +247,23 @@ export function LogViewer({
         ref={scroll}
         className="log-scroll rounded border border-(--color-border) bg-(--color-muted,#eef1f5)"
         role="log"
+        tabIndex={0}
         aria-label={t("instanceLogs")}
         onWheel={(event) => {
-          if (event.deltaY < 0) setFollowLatest(false);
+          if (event.deltaY < 0) setScrollMode("idle");
+        }}
+        onPointerDown={() => setScrollMode("idle")}
+        onKeyDown={(event) => {
+          if (["ArrowUp", "PageUp", "Home"].includes(event.key) ||
+              (event.key === " " && event.shiftKey)) setScrollMode("idle");
         }}
         onScroll={(event) => {
           const panel = event.currentTarget;
           const atBottom =
             panel.scrollTop + panel.clientHeight >= panel.scrollHeight - 80;
-          if (followLatest && !atBottom) setFollowLatest(false);
-          if (atBottom) {
+          // Layout changes and programmatic scrolling also emit scroll events.
+          // Only explicit browsing input above may cancel a pending tail request.
+          if (atBottom && !loading && !failed) {
             autoFill.current = 0;
             void loadNext();
           }

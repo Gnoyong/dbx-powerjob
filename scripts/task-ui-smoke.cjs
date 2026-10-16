@@ -70,7 +70,22 @@ const assert = require("node:assert/strict");
             case "powerjob/instances": return page([{ instanceId: "9007199254740993", status: 4 }]);
             case "powerjob/latestJobInstances": return { data: params.jobIds.map(jobId => window.__latest?.[jobId] ?? ({ jobId, instance: jobId === "7" ? { instanceId: "9007199254740993", status: 3 } : null })) };
             case "powerjob/instance": return { status: 4, result: "failed" };
-            case "powerjob/log": return { index: 0, totalPages: 1, data: "mock log\n" };
+            case "powerjob/log": {
+              if (!window.__logTest) return { index: 0, totalPages: 1, data: "mock log\n" };
+              if (!window.__logInstant) await new Promise(resolve => setTimeout(resolve, 5));
+              if (params.index === window.__logFailIndex) {
+                delete window.__logFailIndex;
+                throw new Error('mock log page failure');
+              }
+              const panel = document.querySelector('.log-scroll');
+              // Layout/virtualizer scroll events can happen before the next RAF.
+              if (panel && params.index > 1) {
+                panel.scrollTop = 0;
+                panel.dispatchEvent(new Event('scroll'));
+              }
+              return { index: params.index, totalPages: window.__logTotal ?? 100,
+                data: Array.from({ length: 25 }, (_, line) => `page ${params.index + 1} line ${line}\n`).join('') };
+            }
             case "powerjob/setJobEnabled": jobs.find(job => job.id === params.jobId).enable = params.enabled; return { success: true };
             case "powerjob/deleteJob": jobs.splice(jobs.findIndex(job => job.id === params.jobId), 1); return { success: true };
             case "powerjob/updateJob": Object.assign(jobs.find(job => job.id === params.jobId), params.changes); return { success: true };
@@ -105,6 +120,10 @@ const assert = require("node:assert/strict");
     await frame.locator(".job-item").filter({ hasText: "Beta" }).getByText("No instance records", { exact: true }).waitFor();
     if (process.argv.includes("--latest-only")) {
       await require("./latest-instances-smoke.cjs")({ outer, frame, calls, button, menu, failures });
+      return;
+    }
+    if (process.argv.includes("--logs-only")) {
+      await require("./log-viewer-smoke.cjs")({ outer, frame, calls, button, failures });
       return;
     }
     assert.equal((await calls("powerjob/apps"))[0].params.index, 1);
