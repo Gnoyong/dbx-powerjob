@@ -7,6 +7,7 @@ import type {
 } from "./workflow/types";
 
 type MethodResult = {
+  "powerjob/users": NotificationUser[];
   "powerjob/workflowCapabilities": { readOnly: boolean };
   "powerjob/workflows": Page<WorkflowDefinition>;
   "powerjob/workflow": WorkflowDefinition;
@@ -35,6 +36,13 @@ type MethodResult = {
   "powerjob/updateJob": { success: boolean };
   "powerjob/retryFailedInstance": { success: boolean };
   "powerjob/runJob": { instanceId: string };
+};
+
+export type NotificationUser = {
+  id: string;
+  username?: string;
+  showName?: string | null;
+  enable?: boolean;
 };
 
 type Context = { connectionId?: string } | null;

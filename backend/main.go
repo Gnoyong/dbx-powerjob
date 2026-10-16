@@ -76,7 +76,7 @@ func (p *plugin) Handle(_ dbxpluginsdk.RequestContext, method string, params jso
 			return nil, dbxpluginsdk.NewError(-32000, err.Error())
 		}
 		return map[string]any{"message": message}, nil
-	case "powerjob/apps", "powerjob/jobs", "powerjob/job", "powerjob/instances", "powerjob/instance", "powerjob/log", "powerjob/latestJobInstances":
+	case "powerjob/users", "powerjob/apps", "powerjob/jobs", "powerjob/job", "powerjob/instances", "powerjob/instance", "powerjob/log", "powerjob/latestJobInstances":
 		id, _ := values["connectionId"].(string)
 		p.mu.RLock()
 		s := p.sessions[id]

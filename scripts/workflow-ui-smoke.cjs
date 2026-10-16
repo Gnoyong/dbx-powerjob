@@ -165,6 +165,8 @@ const assert = require("node:assert/strict");
         async invoke(method, p) {
           window.__calls.push({ method, p });
           switch (method) {
+            case "powerjob/users":
+              return [{ id: "2", showName: "PWJB_ADMIN", enable: true }, { id: "4", showName: "PWJB_python", enable: true }];
             case "powerjob/apps":
               return paged([{ id: "2", appName: "Demo" }]);
             case "powerjob/jobs":
@@ -285,6 +287,34 @@ const assert = require("node:assert/strict");
     await page.getByRole("button", { name: "工作流", exact: true }).click();
     await page.getByRole("button", { name: /演示流程/ }).click();
     await page.getByText("清洗数据", { exact: true }).last().waitFor();
+    if (process.argv.includes("--notification-users-only")) {
+      const picker = page.getByRole("button", { name: "通知用户", exact: true });
+      assert(await picker.isDisabled(), "view mode must lock notification users");
+      await page.getByRole("button", { name: "编辑", exact: true }).click();
+      const pickerSize = await picker.evaluate(el => ({ height: el.getBoundingClientRect().height, fontSize: getComputedStyle(el).fontSize }));
+      const inputSize = await page.getByRole("textbox", { name: "名称", exact: true }).evaluate(el => ({ height: el.getBoundingClientRect().height, fontSize: getComputedStyle(el).fontSize }));
+      assert.deepEqual(pickerSize, inputSize, "notification picker must match adjacent input height and font size");
+      await picker.click();
+      const popup = page.locator('[data-slot="popover-content"]');
+      const popupSize = await popup.evaluate(el => ({ width: el.getBoundingClientRect().width, fontSize: getComputedStyle(el).fontSize }));
+      assert.equal(popupSize.fontSize, inputSize.fontSize, "portal must preserve compact typography");
+      assert(Math.abs(popupSize.width - (await picker.boundingBox()).width) <= 1, "dropdown must match the field width");
+      assert.equal(await page.getByRole("textbox", { name: "搜索用户", exact: true }).evaluate(el => el.getBoundingClientRect().height), inputSize.height);
+      await page.getByRole("checkbox", { name: "PWJB_ADMIN", exact: true }).check();
+      await page.getByRole("checkbox", { name: "PWJB_python", exact: true }).check();
+      await page.getByRole("textbox", { name: "搜索用户", exact: true }).fill("python");
+      assert.equal(await page.locator('[data-slot="popover-content"]').getByRole("checkbox").count(), 1);
+      await page.getByRole("checkbox", { name: "PWJB_python", exact: true }).uncheck();
+      await page.getByRole("textbox", { name: "搜索用户", exact: true }).press("Escape");
+      assert.match(await picker.innerText(), /PWJB_ADMIN/);
+      await page.getByRole("button", { name: "保存工作流", exact: true }).click();
+      await page.getByText("保存并验证成功", { exact: true }).waitFor();
+      assert.deepEqual(await page.evaluate(() => window.__calls.find(c => c.method === "powerjob/saveWorkflow").p.draft.config.notifyUserIds), ["2"]);
+      assert(await picker.isDisabled());
+      assert.deepEqual(failures, []);
+      console.log("Notification user sandbox smoke passed: view lock, multi-selection, search, deselection and saved IDs.");
+      return;
+    }
     assert.equal(await page.locator('.wf-nav').count(), 0, 'global workflow tabs should be removed');
     assert.equal(await page.getByRole('tab', { name: '编排', exact: true }).count(), 1);
     const configToggle = page.getByRole('button', { name: '定义与编排', exact: true });
@@ -368,6 +398,14 @@ const assert = require("node:assert/strict");
     await browserPage.setViewportSize({ width: 1450, height: 950 });
     await browserPage.screenshot({ path: path.resolve(__dirname, '../.ui-preview/workflow-density.png') });
     await page.getByRole("button", { name: "编辑", exact: true }).click();
+    await page.getByRole("button", { name: "通知用户", exact: true }).click();
+    await page.getByRole("checkbox", { name: "PWJB_ADMIN", exact: true }).check();
+    await page.getByRole("checkbox", { name: "PWJB_python", exact: true }).check();
+    await page.getByRole("textbox", { name: "搜索用户", exact: true }).fill("python");
+    assert.equal(await page.locator('[data-slot="popover-content"]').getByRole("checkbox").count(), 1);
+    await page.getByRole("checkbox", { name: "PWJB_python", exact: true }).uncheck();
+    await page.getByRole("textbox", { name: "搜索用户", exact: true }).press("Escape");
+    assert.match(await page.getByRole("button", { name: "通知用户", exact: true }).innerText(), /PWJB_ADMIN/);
     await page
       .getByRole("textbox", { name: "名称", exact: true })
       .fill("更新后的流程");
@@ -402,6 +440,7 @@ const assert = require("node:assert/strict");
     assert.equal(await page.getByRole('tab', { name: '编排', exact: true }).getAttribute('aria-selected'), 'true');
     await page.getByRole("button", { name: "保存工作流", exact: true }).click();
     await page.getByText("保存并验证成功", { exact: true }).waitFor();
+    assert.deepEqual(await page.evaluate(() => window.__calls.find(c => c.method === "powerjob/saveWorkflow").p.draft.config.notifyUserIds), ["2"]);
     assert.equal(
       await page.evaluate(
         () =>

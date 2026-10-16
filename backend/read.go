@@ -24,6 +24,24 @@ func (s *session) read(method string, params map[string]any) (any, error) {
 		return nil, err
 	}
 	switch method {
+	case "powerjob/users":
+		appID, err := requiredID(params, "appId")
+		if err != nil {
+			return nil, err
+		}
+		raw, err := s.request("GET", "/user/list", appID, nil, nil)
+		if err != nil {
+			return nil, err
+		}
+		var rows []map[string]any
+		if err := decodeData(raw, &rows); err != nil {
+			return nil, err
+		}
+		users := make([]map[string]any, 0, len(rows))
+		for _, row := range rows {
+			users = append(users, pick(row, []string{"id", "username", "showName", "enable"}))
+		}
+		return users, nil
 	case "powerjob/latestJobInstances":
 		return s.latestJobInstances(params)
 	case "powerjob/apps":

@@ -472,7 +472,10 @@ export function WorkflowCanvas({
           }}
         >
           <Background gap={20} />
-          <Controls showInteractive={false} />
+          <Controls
+            showInteractive={false}
+            className="gap-1"
+          />
           <MiniMap
             pannable
             zoomable

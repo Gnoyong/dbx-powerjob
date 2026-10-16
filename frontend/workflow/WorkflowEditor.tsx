@@ -20,6 +20,7 @@ import { Dialog, DialogContent, DialogTitle } from "../components/ui/dialog";
 import type { Locale } from "../i18n";
 import { WorkflowCanvas } from "./WorkflowCanvas";
 import { NodeEditor } from "./NodeEditor";
+import { NotificationUserSelect } from "./NotificationUserSelect";
 import {
   definitionDraft,
   draftErrors,
@@ -555,8 +556,7 @@ export function WorkflowEditor({
             </label>
             <label>
               {w("description")}
-              <textarea
-                rows={2}
+              <Input
                 value={draft.config.wfDescription ?? ""}
                 onChange={(e) =>
                   commit({
@@ -662,24 +662,22 @@ export function WorkflowEditor({
                 />
               </label>
             ))}
-            <label>
-              {w("notify")}
-              <Input
-                value={draft.config.notifyUserIds?.join(",") ?? ""}
-                onChange={(e) =>
-                  commit({
-                    ...draft,
-                    config: {
-                      ...draft.config,
-                      notifyUserIds: e.target.value
-                        .split(",")
-                        .map((id) => id.trim())
-                        .filter(Boolean),
-                    },
-                  })
-                }
-              />
-            </label>
+            <NotificationUserSelect
+              connectionId={connectionId}
+              appId={appId}
+              locale={locale}
+              disabled={locked}
+              value={draft.config.notifyUserIds ?? []}
+              onChange={(notifyUserIds) =>
+                commit({
+                  ...draft,
+                  config: {
+                    ...draft.config,
+                    notifyUserIds,
+                  },
+                })
+              }
+            />
           </fieldset>
         </div>
       </section>
