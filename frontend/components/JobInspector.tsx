@@ -919,7 +919,6 @@ function JobForm({
                                   disabled={
                                     busy || !values["lifeCycle." + part]
                                   }
-                                  className="h-7"
                                   value={
                                     values["lifeCycle." + part]?.slice(
                                       11,

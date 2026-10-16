@@ -116,7 +116,6 @@ export function JobsPane({
             {t("jobKeyword")}
           </label>
           <Input
-            className="h-7 "
             id="job-keyword"
             type="search"
             placeholder={t("searchJobs")}

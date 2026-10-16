@@ -14,13 +14,6 @@
   line-height: 1.4;
 }
 
-/* Match the compact controls used in the Jobs workspace. */
-.wf-workspace input[data-slot="input"] {
-  height: 28px;
-  padding: 3px 7px;
-  font-size: 12px;
-}
-
 .wf-workspace :is(h3, legend) {
   margin: 0 0 6px;
   font-size: 12px;

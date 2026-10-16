@@ -109,7 +109,6 @@ export function RunsPane({
                   {t("instanceId")}
                 </label>
                 <Input
-                  className="h-7"
                   id="instance-id"
                   inputMode="numeric"
                   placeholder={t("instanceId")}

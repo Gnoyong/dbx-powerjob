@@ -59,7 +59,7 @@ export function NotificationUserSelect({ connectionId, appId, locale, value, dis
         </PopoverTrigger>
         <PopoverContent className="w-[var(--radix-popover-trigger-width)]! p-1.5! text-xs leading-[1.4]" aria-labelledby={labelId}>
           <div className="flex min-w-0 flex-col gap-1">
-            <Input className="h-7 px-[7px] py-[3px] text-xs md:text-xs" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={w("searchNotifyUsers")} aria-label={w("searchNotifyUsers")} />
+            <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={w("searchNotifyUsers")} aria-label={w("searchNotifyUsers")} />
             {loading && <p role="status">{w("loadingNotifyUsers")}</p>}
             {error && <div role="alert" className="flex flex-col gap-1"><p>{w("notifyUsersFailed")}</p><p className="text-xs text-muted-foreground">{error}</p><Button type="button" size="xs" variant="secondary" onClick={() => setEpoch((n) => n + 1)}>{w("retry")}</Button></div>}
             <div className="flex max-h-48 flex-col overflow-y-auto">

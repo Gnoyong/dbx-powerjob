@@ -285,7 +285,6 @@ export function NodeEditor({
               role="search"
             >
               <Input
-                className="h-7 px-[7px] py-[3px] text-xs md:text-xs"
                 type="search"
                 aria-label={w("searchJobs")}
                 placeholder={w("searchJobs")}
