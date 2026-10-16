@@ -501,7 +501,7 @@ export function WorkflowInstances({
                           }}
                           groupResizeBehavior="preserve-pixel-size"
                         >
-                          <aside className="wf-inspector h-full! w-full! min-w-0!">
+                          <aside className="wf-inspector flex h-full! w-full! min-w-0! flex-col [&>*]:shrink-0">
                             <div className="mb-2 flex items-center justify-between gap-1">
                               {!inspectorCollapsed && (
                                 <h3 className="m-0!">{w("nodeDetails")}</h3>
@@ -633,7 +633,7 @@ export function WorkflowInstances({
                                         >
                                           {w("details")}
                                         </Button>
-                                        <div className="wf-node-logs">
+                                        <div className="mt-2.5 flex min-h-[250px] flex-1 flex-col">
                                           <LogViewer
                                             key={node.instanceId}
                                             connectionId={connectionId}

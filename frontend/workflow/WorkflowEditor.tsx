@@ -626,7 +626,7 @@ export function WorkflowEditor({
                 }
               />
             </label>
-            <label className="wf-check">
+            {/* <label className="wf-check">
               <input
                 type="checkbox"
                 checked={draft.config.enable}
@@ -638,7 +638,7 @@ export function WorkflowEditor({
                 }
               />
               {w("enabled")}
-            </label>
+            </label> */}
             {(["start", "end"] as const).map((key) => (
               <label key={key}>
                 {w(key === "start" ? "lifecycleStart" : "lifecycleEnd")}

@@ -426,19 +426,6 @@
   color: #23835e;
 }
 
-.wf-node-logs {
-  display: flex;
-  flex-direction: column;
-  min-height: 250px;
-  height: 350px;
-  margin-top: 10px;
-}
-
-.wf-node-logs .log-pane {
-  height: 100%;
-  min-height: 0;
-}
-
 @media (max-width: 1000px) {
   .wf-list {
     width: 180px;
