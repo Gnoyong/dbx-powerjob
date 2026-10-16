@@ -4,25 +4,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useLogs, type LogExportProgress } from "../hooks/useLogs";
 import type { T } from "../uiTypes";
+import { FileTransferUnavailableError, saveLogFile } from "../host";
 
 type ExportState =
   { status: "idle" } | ({ status: "exporting" } & LogExportProgress);
-
-function downloadLog(content: string, instanceId: string) {
-  const url = URL.createObjectURL(
-    new Blob([content], {
-      type: "text/plain;charset=utf-8",
-    }),
-  );
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `powerjob-instance-${instanceId}.log`;
-  link.hidden = true;
-  document.body.append(link);
-  link.click();
-  link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
 
 export function LogViewer({
   connectionId,
@@ -205,14 +190,19 @@ export function LogViewer({
                   });
                 }, controller.signal);
                 if (controller.signal.aborted) return;
-                downloadLog(exported.content, instanceId);
+                const saved = await saveLogFile(exported.content, instanceId, controller.signal);
+                if (controller.signal.aborted) return;
+                if (!saved) {
+                  toast.dismiss(toastId);
+                  return;
+                }
                 toast.success(
                   t("logsExported", { count: exported.pageCount }),
                   { id: toastId, closeButton: true, duration: 4000 },
                 );
-              } catch {
+              } catch (error) {
                 if (!controller.signal.aborted) {
-                  toast.error(t("logExportFailed"), {
+                  toast.error(t(error instanceof FileTransferUnavailableError ? "logExportUnavailable" : "logExportFailed"), {
                     id: toastId,
                     closeButton: true,
                     duration: 8000,

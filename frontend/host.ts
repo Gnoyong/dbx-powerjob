@@ -47,9 +47,16 @@ export type NotificationUser = {
 };
 
 type Context = { connectionId?: string } | null;
+type FileTransfer = {
+  beginSave(options: { name: string; contentType?: string; size?: number }): Promise<{ handleId: string; chunkBytes: number } | null>;
+  write(handleId: string, offset: number, data: Uint8Array): Promise<{ written: number; nextOffset: number }>;
+  finish(handleId: string): Promise<unknown>;
+  cancel(handleId: string): Promise<unknown>;
+};
 type Host = {
   ready: Promise<void>;
-  capabilities?: { storage?: boolean };
+  capabilities?: { storage?: boolean; fileTransfer?: { beginSave?: boolean } };
+  fileTransfer?: FileTransfer;
   storage?: {
     get(key: string): Promise<unknown>;
     set(key: string, value: unknown): Promise<unknown>;
@@ -75,6 +82,47 @@ export function getHost(): Host {
   const host = window.dbxPlugin;
   if (!host) throw new Error("DBX plugin bridge unavailable");
   return host;
+}
+
+export class FileTransferUnavailableError extends Error {
+  constructor() { super("DBX file transfer unavailable"); }
+}
+
+export async function saveLogFile(content: string, instanceId: string, signal?: AbortSignal): Promise<boolean> {
+  const host = getHost();
+  await host.ready;
+  signal?.throwIfAborted();
+  const transfer = host.fileTransfer;
+  if (!host.capabilities?.fileTransfer?.beginSave || !transfer)
+    throw new FileTransferUnavailableError();
+  const bytes = new TextEncoder().encode(content);
+  const target = await transfer.beginSave({
+    name: `powerjob-instance-${instanceId}.log`,
+    contentType: "text/plain;charset=utf-8",
+    size: bytes.length,
+  });
+  if (!target) return false;
+  try {
+    signal?.throwIfAborted();
+    if (!Number.isSafeInteger(target.chunkBytes) || target.chunkBytes <= 0)
+      throw new Error("Invalid file transfer chunk size");
+    const chunkSize = Math.min(target.chunkBytes, 256 * 1024);
+    for (let offset = 0; offset < bytes.length;) {
+      signal?.throwIfAborted();
+      const chunk = bytes.slice(offset, offset + chunkSize);
+      const result = await transfer.write(target.handleId, offset, chunk);
+      signal?.throwIfAborted();
+      if (result.written !== chunk.length || result.nextOffset !== offset + chunk.length)
+        throw new Error("Incomplete file transfer write");
+      offset = result.nextOffset;
+    }
+    signal?.throwIfAborted();
+    await transfer.finish(target.handleId);
+    return true;
+  } catch (error) {
+    try { await transfer.cancel(target.handleId); } catch { /* Keep the original write/abort error. */ }
+    throw error;
+  }
 }
 
 async function getStorage() {

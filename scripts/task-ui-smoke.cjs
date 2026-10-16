@@ -111,6 +111,10 @@ const assert = require("node:assert/strict");
     const button = name => frame.getByRole("button", { name, exact: true });
     await frame.waitForFunction(() => document.querySelector("#app-select")?.value === "4");
     await frame.locator(".job-item").first().waitFor();
+    if (process.argv.includes("--export-only")) {
+      await require("./log-export-smoke.cjs")({ frame, calls, button, failures });
+      return;
+    }
     if (process.argv.includes("--stop-only")) {
       await require("./stop-instance-smoke.cjs")({ frame, calls, button, failures });
       return;
