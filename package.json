@@ -10,7 +10,7 @@
     "build:watch": "node scripts/watch-ui.mjs",
     "typecheck": "tsc --noEmit",
     "test:workflow": "node scripts/test-workflow.mjs",
-    "test:tasks": "node --test scripts/task-contract.test.mjs scripts/action-gate.test.mjs"
+    "test:tasks": "node --test scripts/task-contract.test.mjs scripts/action-gate.test.mjs scripts/stop-instance.test.mjs"
   },
   "dependencies": {
     "@dagrejs/dagre": "^3.1.1",

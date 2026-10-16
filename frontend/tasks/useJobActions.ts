@@ -4,6 +4,7 @@ import { notifyAction } from "../notifications";
 import type { ActionNotificationKey } from "../notifications";
 import type { TranslationKey } from "../i18n";
 import type { T } from "../uiTypes";
+import type { InstanceType } from "../types";
 import { createActionGate } from "./actionGate";
 
 type ActionResult<R> =
@@ -16,7 +17,7 @@ function actionErrorKey(error: unknown): TranslationKey | null {
   if (/read.only/i.test(message)) return "readOnlyAction";
   if (/session expired|access denied/i.test(message)) return "actionSessionExpired";
   if (/rejected the request|denied access/i.test(message)) return "powerJobDenied";
-  if (/already changed|exported job changed|only failed normal instances|job was not updated|job was not found/i.test(message))
+  if (/already changed|exported job changed|only failed normal instances|only running instances|instance was not found|job was not updated|job was not found/i.test(message))
     return "actionStateChanged";
   if (/job state did not change/i.test(message)) return "actionNotApplied";
   return null;
@@ -94,6 +95,9 @@ export function useJobActions(connectionId: string | null, appId: string, select
     run: (jobId: string, instanceParams: string) => execute(connection => invoke(connection, "powerjob/runJob", {
       appId, jobId, instanceParams,
     }), "runningJob", "runJobFailed", "jobRunRequested", value => ({ id: value.instanceId })),
+    stop: (jobId: string, instanceId: string | number, type: InstanceType) => execute(connection => invoke(connection, "powerjob/stopInstance", {
+      appId, jobId, instanceId, type,
+    }), "stoppingInstance", "stopInstanceFailed", "instanceStopRequested"),
     retry: (jobId: string, instanceId: string | number) => execute(connection => invoke(connection, "powerjob/retryFailedInstance", {
       appId, jobId, instanceId,
     }), "retryingInstance", "retryFailedMessage", "instanceRetried"),

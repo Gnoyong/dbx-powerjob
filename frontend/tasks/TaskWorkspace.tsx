@@ -11,9 +11,9 @@ import { CreateJobDialog } from "../components/CreateJobDialog";
 import { ConfirmActionDialog } from "../components/ConfirmActionDialog";
 import { useStoredPanelSize } from "../hooks/useStoredPanelSize";
 import { useStorageToast } from "../hooks/useStorageToast";
-import { label } from "../format";
+import { isRunningInstance, label } from "../format";
 import type { Locale, TranslationKey } from "../i18n";
-import type { Instance, Job, JobDetail } from "../types";
+import type { Instance, InstanceType, Job, JobDetail } from "../types";
 import type { T } from "../uiTypes";
 import { useJobs } from "./useJobs";
 import { useJobDetail } from "./useJobDetail";
@@ -24,6 +24,7 @@ import { useLatestJobInstances } from "./useLatestJobInstances";
 type Confirmation =
   | { kind: "jobEnabled"; job: Job; enabled: boolean }
   | { kind: "deleteJob"; job: Job }
+  | { kind: "stopInstance"; instance: Instance; jobId: string; type: InstanceType }
   | { kind: "retryInstance"; instance: Instance; jobId: string };
 export type TaskWorkspaceHandle = { create: () => void; refresh: () => void };
 
@@ -160,6 +161,17 @@ export function TaskWorkspace({ connectionId, appId, locale, t, visible, ref, on
       latestInstances.refresh(String(job.id));
       setTab("runs");
     } else if (result.status === "failed") setRunError(result.error ?? "runJobFailed");
+  }
+  function requestStopInstance(instance: Instance) {
+    if (!connectionId || !appId || !selectedJobId || actions.isBusy() || !isRunningInstance(instance.status, filterType)) return;
+    setConfirmation({ kind: "stopInstance", instance, jobId: selectedJobId, type: filterType });
+  }
+  async function stopInstance(instance: Instance, jobId: string, type: InstanceType) {
+    const result = await actions.stop(jobId, instance.instanceId, type);
+    if (result.status === "success") {
+      runs.refreshInstances();
+      latestInstances.refresh(jobId);
+    }
   }
   function requestRetryFailedInstance(instance: Instance) {
     if (!connectionId || !appId || !selectedJobId || actions.isBusy() || filterType !== "NORMAL") return;
@@ -298,6 +310,7 @@ export function TaskWorkspace({ connectionId, appId, locale, t, visible, ref, on
               onChooseInstance={chooseInstance}
               onOpenInstance={setModal}
               onRetryInstance={requestRetryFailedInstance}
+              onStopInstance={requestStopInstance}
               busy={actionBusy}
               logRefresh={instancesRefresh}
               onPage={pageInstances}
@@ -356,7 +369,7 @@ export function TaskWorkspace({ connectionId, appId, locale, t, visible, ref, on
             ? t(confirmation.enabled ? "enableJob" : "disableJob")
             : confirmation.kind === "deleteJob"
               ? t("deleteJob")
-              : t("retryFailed")
+              : t(confirmation.kind === "stopInstance" ? "stopInstance" : "retryFailed")
         }
         message={
           confirmation.kind === "jobEnabled"
@@ -374,7 +387,7 @@ export function TaskWorkspace({ connectionId, appId, locale, t, visible, ref, on
                 name: label(confirmation.job.jobName),
                 id: confirmation.job.id,
               })
-              : t("confirmRetryFailed", {
+              : t(confirmation.kind === "stopInstance" ? "confirmStopInstance" : "confirmRetryFailed", {
                 id: confirmation.instance.instanceId,
               })
         }
@@ -383,9 +396,9 @@ export function TaskWorkspace({ connectionId, appId, locale, t, visible, ref, on
             ? t(confirmation.enabled ? "enableJob" : "disableJob")
             : confirmation.kind === "deleteJob"
               ? t("deleteJob")
-              : t("retryFailed")
+              : t(confirmation.kind === "stopInstance" ? "stopInstance" : "retryFailed")
         }
-        destructive={confirmation.kind === "deleteJob"}
+        destructive={confirmation.kind === "deleteJob" || confirmation.kind === "stopInstance"}
         busy={actionBusy}
         onConfirm={() => {
           const target = confirmation;
@@ -394,6 +407,8 @@ export function TaskWorkspace({ connectionId, appId, locale, t, visible, ref, on
             void setJobEnabled(target.job, target.enabled);
           } else if (target.kind === "deleteJob") {
             void deleteJob(target.job);
+          } else if (target.kind === "stopInstance") {
+            void stopInstance(target.instance, target.jobId, target.type);
           } else {
             void retryFailedInstance(target.instance, target.jobId);
           }

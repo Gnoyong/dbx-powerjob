@@ -123,6 +123,10 @@ export function jobDateLabel(value: unknown, locale: Locale): string {
       }).format(date);
 }
 
+export function isRunningInstance(value: unknown, type: InstanceType): boolean {
+  return statusKeys[type][String(value).toUpperCase()] === "instanceRunning";
+}
+
 export function isFailedNormalInstance(
   value: unknown,
   type: InstanceType,

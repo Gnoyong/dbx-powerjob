@@ -67,7 +67,7 @@ const assert = require("node:assert/strict");
               id: params.jobId, appId: params.appId, jobName: jobs.find(job => job.id === String(params.jobId))?.jobName || "Alpha", enable: true,
               timeExpressionType: "API", timeExpression: "", executeType: "STANDALONE", processorType: "BUILT_IN", processorInfo: "demo.Processor",
             };
-            case "powerjob/instances": return page([{ instanceId: "9007199254740993", status: 4 }]);
+            case "powerjob/instances": return page(window.__instances ?? [{ instanceId: "9007199254740993", status: 4 }]);
             case "powerjob/latestJobInstances": return { data: params.jobIds.map(jobId => window.__latest?.[jobId] ?? ({ jobId, instance: jobId === "7" ? { instanceId: "9007199254740993", status: 3 } : null })) };
             case "powerjob/instance": return { status: 4, result: "failed" };
             case "powerjob/log": {
@@ -91,6 +91,7 @@ const assert = require("node:assert/strict");
             case "powerjob/updateJob": Object.assign(jobs.find(job => job.id === params.jobId), params.changes); return { success: true };
             case "powerjob/createJob": case "powerjob/copyJob": case "powerjob/retryFailedInstance": return { success: true };
             case "powerjob/runJob": return { instanceId: "9007199254740993" };
+            case "powerjob/stopInstance": return { success: true };
             case "powerjob/workflowCapabilities": return { readOnly: false };
             case "powerjob/workflows": return page([]);
             default: throw new Error("Unexpected RPC " + method);
@@ -110,6 +111,10 @@ const assert = require("node:assert/strict");
     const button = name => frame.getByRole("button", { name, exact: true });
     await frame.waitForFunction(() => document.querySelector("#app-select")?.value === "4");
     await frame.locator(".job-item").first().waitFor();
+    if (process.argv.includes("--stop-only")) {
+      await require("./stop-instance-smoke.cjs")({ frame, calls, button, failures });
+      return;
+    }
     assert(await frame.locator(".job-item").first().evaluate(item => {
       const main = item.querySelector(".job-main");
       return main.firstElementChild.matches(".job-instance-status") &&
@@ -149,7 +154,7 @@ const assert = require("node:assert/strict");
     await menu("Alpha", "Delete job");
     await frame.evaluate(() => {
       window.__jobs.shift();
-      [...document.querySelectorAll(".toolbar-actions button")].find(button => button.textContent === "Refresh").click();
+      [...document.querySelectorAll(".toolbar button")].find(button => button.textContent === "Refresh").click();
     });
     await frame.waitForFunction(() => !document.querySelector('[role="dialog"]'));
     assert.equal((await calls("powerjob/deleteJob")).length, 0);

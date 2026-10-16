@@ -3,6 +3,7 @@ import type { TranslationKey } from "./i18n";
 import type { T } from "./uiTypes";
 
 const actionKinds = {
+  stoppingInstance: "loading", stopInstanceFailed: "error", instanceStopRequested: "success",
   savingJob: "loading", creatingJob: "loading", loadingJobCopy: "loading",
   deletingJob: "loading", runningJob: "loading", retryingInstance: "loading",
   jobUpdated: "success", jobCreated: "success", jobCopied: "success",

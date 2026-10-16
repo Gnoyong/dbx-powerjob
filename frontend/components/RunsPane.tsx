@@ -12,6 +12,7 @@ import {
   dateLabel,
   instanceStatusOptions,
   isFailedNormalInstance,
+  isRunningInstance,
   label,
   statusLabel,
 } from "../format";
@@ -43,6 +44,7 @@ export function RunsPane({
   onChooseInstance,
   onOpenInstance,
   onRetryInstance,
+  onStopInstance,
   busy,
   logRefresh,
   onPage,
@@ -68,6 +70,7 @@ export function RunsPane({
   onChooseInstance: (instance: Instance) => void;
   onOpenInstance: (instance: Instance) => void;
   onRetryInstance: (instance: Instance) => void;
+  onStopInstance: (instance: Instance) => void;
   busy: boolean;
   logRefresh: number;
   onPage: (index: number) => void;
@@ -233,6 +236,20 @@ export function RunsPane({
                         <td>{dateLabel(instance.actualTriggerTime, locale)}</td>
                         <td>{dateLabel(instance.finishedTime, locale)}</td>
                         <td className="instance-actions">
+                          {isRunningInstance(instance.status, filterType) && (
+                            <Button
+                              size="xs"
+                              type="button"
+                              variant="secondary"
+                              disabled={busy}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                onStopInstance(instance);
+                              }}
+                            >
+                              {t("stopInstance")}
+                            </Button>
+                          )}
                           {isFailedNormalInstance(
                             instance.status,
                             filterType,

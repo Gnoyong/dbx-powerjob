@@ -35,6 +35,7 @@ type MethodResult = {
   "powerjob/copyJob": { success: boolean; jobId?: string };
   "powerjob/updateJob": { success: boolean };
   "powerjob/retryFailedInstance": { success: boolean };
+  "powerjob/stopInstance": { success: boolean };
   "powerjob/runJob": { instanceId: string };
 };
 

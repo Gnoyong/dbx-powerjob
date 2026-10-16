@@ -1,5 +1,7 @@
 export const dictionaries = {
   en: {
+    stopInstance: "Stop", confirmStopInstance: "Stop running instance #{id}? This interrupts its execution.",
+    stoppingInstance: "Stopping instance…", stopInstanceFailed: "Failed to stop instance. Refresh and check permissions or current state.", instanceStopRequested: "Instance stop requested",
     latestInstance: "Latest instance", noInstanceRecords: "No instance records",
     latestInstanceFailed: "Query failed", latestInstanceUpdateFailed: "Update failed",
     layoutStorageFailed: "Could not restore or save the panel layout. Please retry.",
@@ -67,6 +69,8 @@ export const dictionaries = {
     gmtCreate: "Created at", gmtModified: "Modified at",
   },
   "zh-CN": {
+    stopInstance: "停止", confirmStopInstance: "停止正在运行的实例 #{id}？此操作将中断该实例的执行。",
+    stoppingInstance: "正在停止实例…", stopInstanceFailed: "停止实例失败，请刷新并检查权限或当前状态。", instanceStopRequested: "已提交实例停止请求",
     latestInstance: "最新实例", noInstanceRecords: "无实例记录",
     latestInstanceFailed: "查询失败", latestInstanceUpdateFailed: "更新失败",
     layoutStorageFailed: "面板布局读取或保存失败，请重试。",

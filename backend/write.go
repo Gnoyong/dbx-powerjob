@@ -520,7 +520,7 @@ func (s *session) write(method string, params map[string]any) (any, error) {
 			return nil, errors.New("PowerJob acknowledged the action but job state did not change")
 		}
 		return map[string]any{"success": true}, nil
-	case "powerjob/retryFailedInstance":
+	case "powerjob/retryFailedInstance", "powerjob/stopInstance":
 		jobID, err := requiredID(params, "jobId")
 		if err != nil {
 			return nil, err
@@ -529,9 +529,16 @@ func (s *session) write(method string, params map[string]any) (any, error) {
 		if err != nil {
 			return nil, err
 		}
+		instanceType := "NORMAL"
+		if method == "powerjob/stopInstance" {
+			instanceType = asString(params["type"])
+			if instanceType != "NORMAL" && instanceType != "WORKFLOW" {
+				return nil, errors.New("invalid instance type")
+			}
+		}
 		page, err := s.page("/instance/list", appID, map[string]any{
 			"appId": appID, "jobId": jobID, "instanceId": instanceID,
-			"index": 0, "pageSize": 1, "type": "NORMAL", "status": "",
+			"index": 0, "pageSize": 1, "type": instanceType, "status": "",
 		}, instanceListFields)
 		if err != nil {
 			return nil, err
@@ -540,10 +547,16 @@ func (s *session) write(method string, params map[string]any) (any, error) {
 			return nil, errors.New("instance was not found for this job")
 		}
 		status := strings.ToUpper(asString(page.Data[0]["status"]))
-		if status != "4" && status != "FAILED" {
+		path := "/instance/retry"
+		if method == "powerjob/stopInstance" {
+			if status != "3" && status != "RUNNING" {
+				return nil, errors.New("only running instances can be stopped")
+			}
+			path = "/instance/stop"
+		} else if status != "4" && status != "FAILED" {
 			return nil, errors.New("only failed normal instances can be retried")
 		}
-		_, err = s.request("GET", "/instance/retry", appID, url.Values{"instanceId": {instanceID}, "appId": {appID}}, nil)
+		_, err = s.request("GET", path, appID, url.Values{"instanceId": {instanceID}, "appId": {appID}}, nil)
 		if err != nil {
 			return nil, err
 		}

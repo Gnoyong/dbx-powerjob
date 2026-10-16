@@ -534,12 +534,104 @@ func TestRetryOnlyFailedInstanceForJob(t *testing.T) {
 	}
 }
 
+func TestStopOnlyRunningInstanceForJob(t *testing.T) {
+	const instanceID = "981844507211334656"
+	status, actualJob, actualID, calls := "3", "7", instanceID, 0
+	empty, reject := false, false
+	instanceType := "NORMAL"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("AppId") != "2" || r.Header.Get("PowerJwt") != "token" {
+			t.Error("missing scoped authorization")
+		}
+		switch r.URL.Path {
+		case "/instance/list":
+			var body map[string]any
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Error(err)
+			}
+			if body["instanceId"] != instanceID || body["jobId"] != "7" || body["appId"] != "2" || body["type"] != instanceType {
+				t.Error("incorrect scoped instance filter", body)
+			}
+			if empty {
+				fmt.Fprint(w, `{"success":true,"data":{"data":[]}}`)
+				return
+			}
+			fmt.Fprintf(w, `{"success":true,"data":{"data":[{"instanceId":%s,"jobId":%s,"status":%s}]}}`, actualID, actualJob, status)
+		case "/instance/stop":
+			calls++
+			if r.Method != "GET" || r.URL.Query().Get("instanceId") != instanceID || r.URL.Query().Get("appId") != "2" {
+				t.Error("incorrect stop request")
+			}
+			if reject {
+				fmt.Fprint(w, `{"success":false,"message":"denied"}`)
+				return
+			}
+			fmt.Fprint(w, `{"success":true,"data":null}`)
+		default:
+			t.Error("unexpected route", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+	s := &session{baseURL: server.URL, client: server.Client(), jwt: "token"}
+	params := map[string]any{"appId": "2", "jobId": "7", "instanceId": instanceID, "type": "NORMAL"}
+	for _, value := range []string{"1", "2", "4", "5", "9", "10", `"FAILED"`, `"STOPPED"`} {
+		status = value
+		if _, err := s.write("powerjob/stopInstance", params); err == nil {
+			t.Fatal("accepted non-running status", value)
+		}
+	}
+	status = "3"
+	actualJob = "8"
+	if _, err := s.write("powerjob/stopInstance", params); err == nil {
+		t.Fatal("accepted wrong job")
+	}
+	actualJob = "7"
+	actualID = "123"
+	if _, err := s.write("powerjob/stopInstance", params); err == nil {
+		t.Fatal("accepted wrong instance")
+	}
+	actualID = instanceID
+	empty = true
+	if _, err := s.write("powerjob/stopInstance", params); err == nil {
+		t.Fatal("accepted missing instance")
+	}
+	empty = false
+	s.readOnly = true
+	if _, err := s.write("powerjob/stopInstance", params); err == nil {
+		t.Fatal("accepted read-only stop")
+	}
+	s.readOnly = false
+	if calls != 0 {
+		t.Fatal("invalid requests reached stop endpoint")
+	}
+	for _, kind := range []string{"NORMAL", "WORKFLOW"} {
+		instanceType, params["type"] = kind, kind
+		for _, value := range []string{"3", `"RUNNING"`} {
+			status = value
+			if _, err := s.write("powerjob/stopInstance", params); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	if calls != 4 {
+		t.Fatal("unexpected stop count", calls)
+	}
+	reject = true
+	if _, err := s.write("powerjob/stopInstance", params); err == nil {
+		t.Fatal("ignored upstream rejection")
+	}
+}
+
 func TestWriteRejectsInvalidInputBeforeRequest(t *testing.T) {
 	s := &session{}
 	for _, tc := range []struct {
 		method string
 		params map[string]any
 	}{
+		{"powerjob/stopInstance", map[string]any{"appId": "2", "jobId": "7", "instanceId": "bad", "type": "NORMAL"}},
+		{"powerjob/stopInstance", map[string]any{"appId": "2", "jobId": "bad", "instanceId": "8", "type": "NORMAL"}},
+		{"powerjob/stopInstance", map[string]any{"appId": "bad", "jobId": "7", "instanceId": "8", "type": "NORMAL"}},
+		{"powerjob/stopInstance", map[string]any{"appId": "2", "jobId": "7", "instanceId": "8", "type": "bad"}},
 		{"powerjob/setJobEnabled", map[string]any{"appId": "2", "jobId": "7", "enabled": "true"}},
 		{"powerjob/setJobEnabled", map[string]any{"appId": "2", "jobId": "../../delete", "enabled": true}},
 		{"powerjob/retryFailedInstance", map[string]any{"appId": "0", "jobId": "7", "instanceId": "8"}},
