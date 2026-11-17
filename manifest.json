@@ -38,7 +38,7 @@
           "key": "host",
           "label": "Host",
           "type": "text",
-          "default": "powerjob.prod.oceanwear.online",
+          "default": "",
           "binding": "host",
           "required": true
         },
