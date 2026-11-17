@@ -9,7 +9,7 @@ const { preventBrowserShortcut } = await import(`data:text/javascript;base64,${B
 
 function canceled(key, modifiers = {}) {
   let prevented = false;
-  preventBrowserShortcut({ key, ctrlKey: false, metaKey: false, altKey: false, getModifierState: () => false, ...modifiers, preventDefault() { prevented = true; } });
+  preventBrowserShortcut({ key, ctrlKey: false, metaKey: false, altKey: false, shiftKey: false, getModifierState: () => false, ...modifiers, preventDefault() { prevented = true; } });
   return prevented;
 }
 
@@ -18,6 +18,8 @@ test("blocks browser shortcut defaults while keeping ordinary input available", 
     assert.equal(canceled(key, modifiers), true, key);
   }
   for (const key of ["a", "Tab", "Escape", "Control"]) assert.equal(canceled(key), false, key);
+  assert.equal(canceled("f", { ctrlKey: true }), false);
+  assert.equal(canceled("F", { ctrlKey: true, shiftKey: true }), true);
   assert.equal(canceled("@", { ctrlKey: true, altKey: true, getModifierState: (name) => name === "AltGraph" }), false);
 });
 
@@ -37,6 +39,6 @@ test("page shortcut handlers run before browser defaults are canceled", async ()
   for (const handler of [...bubble]) handler(event);
   assert.equal(customRan, true);
   assert.equal(event.defaultPrevented, true);
-  await Promise.resolve();
+  await new Promise((resolve) => setTimeout(resolve, 0));
   assert.equal(bubble.length, 1);
 });

@@ -1,6 +1,7 @@
 /** Cancel browser defaults after existing page shortcut handlers have run. */
 export function preventBrowserShortcut(event: KeyboardEvent) {
   if (event.getModifierState("AltGraph")) return;
+  if (event.ctrlKey && !event.altKey && !event.metaKey && !event.shiftKey && event.key.toLowerCase() === "f") return;
 
   const modifierOnly = ["Control", "Shift", "Alt", "Meta"].includes(event.key);
   if ((!modifierOnly && (event.ctrlKey || event.metaKey || event.altKey)) || /^F([1-9]|1[0-2])$/.test(event.key)) {
@@ -16,6 +17,6 @@ export function installBrowserShortcutGuard(target: Window) {
     // Register during capture so existing window and page handlers run first.
     target.addEventListener("keydown", cancelDefault);
     // Propagation may be stopped before the event reaches window again.
-    queueMicrotask(() => target.removeEventListener("keydown", cancelDefault));
+    setTimeout(() => target.removeEventListener("keydown", cancelDefault), 0);
   }, true);
 }
