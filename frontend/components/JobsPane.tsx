@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
+import { NativeSelect, NativeSelectOption } from "./ui/native-select";
 import { label } from "../format";
 import type { Locale, TranslationKey } from "../i18n";
 import type { LatestJobInstanceMap } from "../tasks/useLatestJobInstances";
 import { JobInstanceStatusIcon } from "./JobInstanceStatusIcon";
-import type { Job, Page } from "../types";
+import type { Job, JobEnabledFilter, Page } from "../types";
 import type { T } from "../uiTypes";
 import { Pager } from "./Pager";
 import { ListPlaceholder } from "./ListPlaceholder";
@@ -19,8 +20,10 @@ export function JobsPane({
   loading,
   status,
   draftKeyword,
+  enabledFilter,
   selectedJobId,
   onDraftKeywordChange,
+  onEnabledFilterChange,
   onSearch,
   onChooseJob,
   onCopyJob,
@@ -37,8 +40,10 @@ export function JobsPane({
   loading: boolean;
   status: TranslationKey;
   draftKeyword: string;
+  enabledFilter: JobEnabledFilter;
   selectedJobId: string;
   onDraftKeywordChange: (value: string) => void;
+  onEnabledFilterChange: (value: JobEnabledFilter) => void;
   onSearch: () => void;
   onChooseJob: (job: Job) => void;
   onCopyJob: (job: Job) => void;
@@ -109,6 +114,22 @@ export function JobsPane({
           className="search-form"
           role="search"
         >
+          <label
+            htmlFor="job-enabled-filter"
+            className="sr-only"
+          >
+            {t("jobEnabledFilter")}
+          </label>
+          <NativeSelect
+            id="job-enabled-filter"
+            aria-label={t("jobEnabledFilter")}
+            value={enabledFilter}
+            onChange={(event) => onEnabledFilterChange(event.target.value as JobEnabledFilter)}
+          >
+            <NativeSelectOption value="all">{t("allJobStates")}</NativeSelectOption>
+            <NativeSelectOption value="enabled">{t("enabled")}</NativeSelectOption>
+            <NativeSelectOption value="disabled">{t("disabled")}</NativeSelectOption>
+          </NativeSelect>
           <label
             htmlFor="job-keyword"
             className="sr-only"

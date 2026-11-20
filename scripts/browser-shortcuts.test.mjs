@@ -19,6 +19,9 @@ test("blocks browser shortcut defaults while keeping ordinary input available", 
   }
   for (const key of ["a", "Tab", "Escape", "Control"]) assert.equal(canceled(key), false, key);
   assert.equal(canceled("f", { ctrlKey: true }), false);
+  assert.equal(canceled("c", { ctrlKey: true }), false);
+  assert.equal(canceled("C", { metaKey: true }), false);
+  assert.equal(canceled("c", { ctrlKey: true, shiftKey: true }), true);
   assert.equal(canceled("F", { ctrlKey: true, shiftKey: true }), true);
   assert.equal(canceled("@", { ctrlKey: true, altKey: true, getModifierState: (name) => name === "AltGraph" }), false);
 });

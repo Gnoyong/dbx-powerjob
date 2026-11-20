@@ -174,3 +174,47 @@ func TestRejectInvalidIDsAndPaginationBeforeRequest(t *testing.T) {
 		}
 	}
 }
+
+func TestJobsEnabledFilterPaginatesAfterFiltering(t *testing.T) {
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		if r.Method != http.MethodPost || r.URL.Path != "/job/list" {
+			t.Errorf("unexpected outbound request: %s %s", r.Method, r.URL.Path)
+		}
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		if body["pageSize"] != float64(100) || body["index"] != float64(0) {
+			t.Errorf("filtered job scan was not unpaged: %#v", body)
+		}
+		fmt.Fprint(w, `{"success":true,"data":{"index":0,"pageSize":100,"totalPages":1,"totalItems":5,"data":[{"id":1,"jobName":"enabled-1","enable":true},{"id":2,"jobName":"disabled-1","enable":false},{"id":3,"jobName":"enabled-2","enable":true},{"id":4,"jobName":"disabled-2","enable":false},{"id":5,"jobName":"enabled-3","enable":true}]}}`)
+	}))
+	defer server.Close()
+
+	s := &session{baseURL: server.URL, client: server.Client()}
+	result, err := s.read("powerjob/jobs", map[string]any{
+		"appId": "2", "index": "1", "pageSize": "2", "enabled": "enabled",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	page := result.(pageResult)
+	if page.Index != 1 || page.PageSize != 2 || page.TotalItems != 3 || page.TotalPages != 2 {
+		t.Fatalf("unexpected filtered page metadata: %#v", page)
+	}
+	if len(page.Data) != 1 || page.Data[0]["id"] != "5" {
+		t.Fatalf("unexpected filtered page data: %#v", page.Data)
+	}
+
+	before := requests
+	if _, err := s.read("powerjob/jobs", map[string]any{
+		"appId": "2", "enabled": "unknown",
+	}); err == nil {
+		t.Fatal("accepted invalid enabled filter")
+	}
+	if requests != before {
+		t.Fatal("invalid enabled filter made an outbound request")
+	}
+}

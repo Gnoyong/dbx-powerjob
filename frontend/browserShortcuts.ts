@@ -2,6 +2,7 @@
 export function preventBrowserShortcut(event: KeyboardEvent) {
   if (event.getModifierState("AltGraph")) return;
   if (event.ctrlKey && !event.altKey && !event.metaKey && !event.shiftKey && event.key.toLowerCase() === "f") return;
+  if (!event.altKey && !event.shiftKey && (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "c") return;
 
   const modifierOnly = ["Control", "Shift", "Alt", "Meta"].includes(event.key);
   if ((!modifierOnly && (event.ctrlKey || event.metaKey || event.altKey)) || /^F([1-9]|1[0-2])$/.test(event.key)) {

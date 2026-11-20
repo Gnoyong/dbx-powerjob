@@ -52,14 +52,18 @@ func (s *session) read(method string, params map[string]any) (any, error) {
 		if err != nil {
 			return nil, err
 		}
-		body := map[string]any{"appId": appID, "index": index, "pageSize": size}
-		if keyword := strings.TrimSpace(asString(params["keyword"])); keyword != "" {
-			if len(keyword) > 100 {
-				return nil, errors.New("keyword is too long")
-			}
-			body["keyword"] = keyword
+		keyword := strings.TrimSpace(asString(params["keyword"]))
+		if len(keyword) > 100 {
+			return nil, errors.New("keyword is too long")
 		}
-		return s.page("/job/list", appID, body, jobListFields)
+		enabled := asString(params["enabled"])
+		if enabled != "" && enabled != "all" && enabled != "enabled" && enabled != "disabled" {
+			return nil, errors.New("invalid enabled filter")
+		}
+		if enabled == "" || enabled == "all" {
+			return s.jobPage(appID, index, size, keyword)
+		}
+		return s.filteredJobPage(appID, index, size, keyword, enabled)
 	case "powerjob/job":
 		appID, err := requiredID(params, "appId")
 		if err != nil {
@@ -200,6 +204,57 @@ func (s *session) page(path, appID string, body any, fields []string) (pageResul
 	}
 	if result.Data == nil {
 		result.Data = []map[string]any{}
+	}
+	return result, nil
+}
+
+func (s *session) jobPage(appID string, index, size int, keyword string) (pageResult, error) {
+	body := map[string]any{"appId": appID, "index": index, "pageSize": size}
+	if keyword != "" {
+		body["keyword"] = keyword
+	}
+	return s.page("/job/list", appID, body, jobListFields)
+}
+
+func (s *session) filteredJobPage(appID string, index, size int, keyword, enabled string) (pageResult, error) {
+	const scanPageSize = 100
+	first, err := s.jobPage(appID, 0, scanPageSize, keyword)
+	if err != nil {
+		return pageResult{}, err
+	}
+
+	matches := make([]map[string]any, 0, first.TotalItems)
+	appendMatches := func(rows []map[string]any) {
+		for _, row := range rows {
+			isEnabled, ok := row["enable"].(bool)
+			if ok && ((enabled == "enabled" && isEnabled) || (enabled == "disabled" && !isEnabled)) {
+				matches = append(matches, row)
+			}
+		}
+	}
+	appendMatches(first.Data)
+	for remoteIndex := 1; remoteIndex < first.TotalPages; remoteIndex++ {
+		page, err := s.jobPage(appID, remoteIndex, scanPageSize, keyword)
+		if err != nil {
+			return pageResult{}, err
+		}
+		appendMatches(page.Data)
+	}
+
+	result := pageResult{
+		Index:      index,
+		PageSize:   size,
+		TotalItems: len(matches),
+		TotalPages: (len(matches) + size - 1) / size,
+		Data:       []map[string]any{},
+	}
+	start := index * size
+	if start < len(matches) {
+		end := start + size
+		if end > len(matches) {
+			end = len(matches)
+		}
+		result.Data = matches[start:end]
 	}
 	return result, nil
 }

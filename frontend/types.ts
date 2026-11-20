@@ -19,6 +19,7 @@ export type Job = {
   timeExpressionType?: string;
   timeExpression?: string;
 };
+export type JobEnabledFilter = "all" | "enabled" | "disabled";
 
 export type JobDetail = Record<string, unknown>;
 export type InstanceType = "NORMAL" | "WORKFLOW";

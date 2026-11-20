@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { invoke } from "../host";
-import type { Job, Page } from "../types";
+import type { Job, JobEnabledFilter, Page } from "../types";
 import type { TranslationKey } from "../i18n";
 
 export function useJobs(connectionId: string | null, appId: string) {
   const [jobsIndex, setJobsIndex] = useState(0);
   const [draftKeyword, setDraftKeyword] = useState("");
   const [keyword, setKeyword] = useState("");
+  const [enabledFilter, setEnabledFilter] = useState<JobEnabledFilter>("all");
   const [jobs, setJobs] = useState<Page<Job> | null>(null);
   const [jobsStatus, setJobsStatus] =
     useState<TranslationKey>("selectConnection");
@@ -19,6 +20,7 @@ export function useJobs(connectionId: string | null, appId: string) {
     setJobsIndex(0);
     setJobs(null);
     setSelectedJobId("");
+    setEnabledFilter("all");
   }, [scope]);
   useEffect(() => { setKeyword(""); setDraftKeyword(""); }, [connectionId]);
   useEffect(() => {
@@ -34,6 +36,7 @@ export function useJobs(connectionId: string | null, appId: string) {
       index: jobsIndex,
       pageSize: 20,
       keyword,
+      enabled: enabledFilter,
     })
       .then((page) => {
         if (!active) return;
@@ -54,7 +57,7 @@ export function useJobs(connectionId: string | null, appId: string) {
     return () => {
       active = false;
     };
-  }, [connectionId, appId, jobsIndex, keyword, refresh, owner, scope]);
+  }, [connectionId, appId, jobsIndex, keyword, refresh, owner, scope, enabledFilter]);
   function searchJobs() {
     setJobsIndex(0);
     const next = draftKeyword.trim();
@@ -63,12 +66,23 @@ export function useJobs(connectionId: string | null, appId: string) {
   }
   const refreshJobs = useCallback(() => setRefresh(value => value + 1), []);
   function selectJob(id: string) { setSelectedJobId(id); }
+  function onEnabledFilterChange(filter: JobEnabledFilter) {
+    setEnabledFilter(filter);
+    setJobsIndex(0);
+    setJobs(null);
+    setJobsStatus("loadingJobs");
+    setSelectedJobId("");
+  }
   function jobDeleted(id: string) {
     if (id === selectedJobId) setSelectedJobId("");
     if (jobs?.data.length === 1 && jobsIndex > 0) setJobsIndex(value => Math.max(0, value - 1));
     else refreshJobs();
   }
   function patchEnabled(id: string, enabled: boolean) {
+    if (enabledFilter !== "all") {
+      refreshJobs();
+      return;
+    }
     setJobs(previous => previous ? {
       ...previous, data: previous.data.map(job =>
         String(job.id) === id ? { ...job, enable: enabled } : job)
@@ -77,7 +91,8 @@ export function useJobs(connectionId: string | null, appId: string) {
   const currentJobs = owner === scope ? jobs : null;
   return {
     jobs: currentJobs, jobsStatus, jobsLoading: owner !== scope || jobsStatus === "loadingJobs",
-    draftKeyword, setDraftKeyword, selectedJobId: owner === scope ? selectedJobId : "",
+    draftKeyword, setDraftKeyword, enabledFilter, onEnabledFilterChange,
+    selectedJobId: owner === scope ? selectedJobId : "",
     selectedJob: currentJobs?.data.find(item => String(item.id) === selectedJobId) ?? null,
     searchJobs, selectJob, pageJobs: setJobsIndex, refreshJobs, refresh, jobDeleted, patchEnabled
   };

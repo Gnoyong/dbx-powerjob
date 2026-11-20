@@ -40,7 +40,8 @@ export function TaskWorkspace({ connectionId, appId, locale, t, visible, ref, on
 }) {
   const [tab, setTab] = useState<"detail" | "runs">("detail");
   const jobsState = useJobs(connectionId, appId);
-  const { jobs, jobsStatus, jobsLoading, draftKeyword, setDraftKeyword, selectedJobId,
+  const { jobs, jobsStatus, jobsLoading, draftKeyword, setDraftKeyword, enabledFilter,
+    onEnabledFilterChange, selectedJobId,
     selectedJob, searchJobs, pageJobs, refresh } = jobsState;
   const latestInstances = useLatestJobInstances(connectionId, appId, jobs, visible && !jobsLoading);
   const { detail, detailStatus } = useJobDetail(connectionId, appId, selectedJobId, refresh);
@@ -213,8 +214,10 @@ export function TaskWorkspace({ connectionId, appId, locale, t, visible, ref, on
             loading={jobsLoading}
             status={jobsStatus}
             draftKeyword={draftKeyword}
+            enabledFilter={enabledFilter}
             selectedJobId={selectedJobId}
             onDraftKeywordChange={setDraftKeyword}
+            onEnabledFilterChange={onEnabledFilterChange}
             onSearch={searchJobs}
             onChooseJob={chooseJob}
             onCopyJob={startCopyingJob}
