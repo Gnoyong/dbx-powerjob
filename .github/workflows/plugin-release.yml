@@ -22,17 +22,17 @@ jobs:
         with:
           ref: ${{ github.event.release.tag_name || inputs.release-tag }}
 
-      - name: Check tag, package.json, and manifest.json agree
+      - name: Check tag and generated version metadata agree
         env:
           RELEASE_TAG: ${{ github.event.release.tag_name || inputs.release-tag }}
         run: |
           tag_version="${RELEASE_TAG#v}"
           package_version="$(node -p 'require("./package.json").version')"
-          manifest_version="$(node -p 'require("./manifest.json").version')"
-          if [ "$tag_version" != "$package_version" ] || [ "$tag_version" != "$manifest_version" ]; then
-            echo "Tag $RELEASE_TAG does not match package.json ($package_version) and manifest.json ($manifest_version)." >&2
+          if [ "$tag_version" != "$package_version" ]; then
+            echo "Tag $RELEASE_TAG does not match package.json ($package_version)." >&2
             exit 1
           fi
+          node scripts/sync-version.mjs --check
           echo "Releasing version $tag_version"
 
   release:
@@ -47,6 +47,7 @@ jobs:
           npm install --global "$package_manager"
         fi
         pnpm install --frozen-lockfile
+        node scripts/sync-version.mjs --check
         pnpm typecheck
         pnpm run build
         dbx-plugin package .

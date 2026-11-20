@@ -40,8 +40,8 @@ assert.throws(() => vm.runInNewContext(source, {
   path, delimiter: path.delimiter, fileURLToPath, existsSync, mkdirSync,
   readFileSync(filePath, encoding) {
     const value = readFileSync(filePath, encoding);
-    return String(filePath).endsWith("main.go")
-      ? value.replace(/Version:\s*"[^"]+"/, 'Version: "0.0.0"')
+    return String(filePath).endsWith("version.go")
+      ? value.replace(/const pluginVersion = "[^"]+"/, 'const pluginVersion = "0.0.0"')
       : value;
   },
   process: {
@@ -52,5 +52,5 @@ assert.throws(() => vm.runInNewContext(source, {
   spawnSync() { throw new Error("Go must not start with a version mismatch"); },
   spawn() { throw new Error("DBX must not start with a version mismatch"); },
 }), /Launcher exited 1/);
-assert.match(mismatchMessage, /Sidecar version 0\.0\.0 does not match manifest version/);
+assert.match(mismatchMessage, /Generated sidecar version 0\.0\.0 does not match manifest version/);
 console.log("Sidecar/manifest version mismatch regression passed.");

@@ -12,3 +12,7 @@
 - 日志导出使用 DBX file transfer。
 - 当前 PowerJob 接口契约基于 5.1.2。
 
+## 未发布
+
+- 统一版本维护入口为 `package.json.version`；`manifest.json` 和 `backend/version.go` 由 `scripts/sync-version.mjs` 生成并由 CI 校验。
+

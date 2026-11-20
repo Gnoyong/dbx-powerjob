@@ -21,15 +21,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check package.json and manifest.json versions match
-        run: |
-          package_version="$(node -p 'require("./package.json").version')"
-          manifest_version="$(node -p 'require("./manifest.json").version')"
-          if [ "$package_version" != "$manifest_version" ]; then
-            echo "Version mismatch: package.json=$package_version manifest.json=$manifest_version" >&2
-            exit 1
-          fi
-          echo "Release version $manifest_version"
+      - name: Check generated version metadata
+        run: node scripts/sync-version.mjs --check
 
   backend:
     name: Check Go backend
@@ -92,6 +85,7 @@ jobs:
       - name: Typecheck, build, and package
         run: |
           pnpm install --frozen-lockfile
+          node scripts/sync-version.mjs --check
           pnpm typecheck
           pnpm build
           dbx-plugin package . --target linux-x64

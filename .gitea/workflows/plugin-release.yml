@@ -40,15 +40,16 @@ jobs:
           $ErrorActionPreference = "Stop"
           $tagVersion = $env:GITHUB_REF_NAME -replace '^v', ''
           $packageVersion = node -p "require('./package.json').version"
-          $manifestVersion = node -p "require('./manifest.json').version"
 
-          if ($tagVersion -ne $packageVersion -or $tagVersion -ne $manifestVersion) {
-            throw "Tag $env:GITHUB_REF_NAME does not match package.json ($packageVersion) and manifest.json ($manifestVersion)."
+          if ($tagVersion -ne $packageVersion) {
+            throw "Tag $env:GITHUB_REF_NAME does not match package.json ($packageVersion)."
           }
+          node scripts/sync-version.mjs --check
 
       - name: Build release package
         run: |
           pnpm install --frozen-lockfile
+          node scripts/sync-version.mjs --check
           pnpm run typecheck
           pnpm run build
           node node_modules/@dbx-app/plugin-cli/bin/dbx-plugin.js package .
